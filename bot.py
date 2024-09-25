@@ -2,7 +2,6 @@ import os
 
 import discord
 import requests
-import json
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -32,9 +31,9 @@ async def on_message(message):
     if '[' and ']' in message.content:
         start = message.content.index('[') + 1
         card_name = message.content[start:message.content.index(']')]
-        api = requests.get(f'https://api.scryfall.com/cards/named?exact={card_name}')
-        data = api.json()
-        image = data['image_uris']['normal']
+        api = await requests.get(f'https://api.scryfall.com/cards/named?exact={card_name}')
+        data = await api.json()
+        image = await data['image_uris']['normal']
         await message.channel.send(image)
     
     
