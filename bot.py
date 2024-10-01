@@ -3,6 +3,7 @@ import os
 import discord
 import requests
 from dotenv import load_dotenv
+from bs4 import BeautifulSoup
 
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
@@ -30,11 +31,19 @@ async def on_message(message):
         return
     if '[' and ']' in message.content:
         start = message.content.index('[') + 1
-        card_name = message.content[start:message.content.index(']')]
+        card_name = message.content[start:message.content.index(']')].lower()
         api = await requests.get(f'https://api.scryfall.com/cards/named?exact={card_name}')
         data = await api.json()
-        image = await data['image_uris']['normal']
+        image = data['image_uris']['normal']
         await message.channel.send(image)
-    
+    elif '{' and '}' in message.content:
+        start = message.content.index('{') + 1
+        keyword = message.content[start:message.content.index('}')]
+        URL = f'https://mtg.fandom.com/wiki/{keyword}'
+        page = requests.get(URL)
+        wiki = BeautifulSoup(page.content, 'html.parser')
+        result = wiki.find('table').prettify()
+        print(result)
+        await message.channel.send(result)
     
 client.run(TOKEN)
