@@ -32,10 +32,18 @@ async def on_message(message):
     if '[' and ']' in message.content:
         start = message.content.index('[') + 1
         card_name = message.content[start:message.content.index(']')].lower()
-        api = await requests.get(f'https://api.scryfall.com/cards/named?exact={card_name}')
-        data = await api.json()
-        image = data['image_uris']['normal']
-        await message.channel.send(image)
+        api = requests.get(f'https://api.scryfall.com/cards/named?exact={card_name}')
+        data = api.json()
+        print(data)
+        if 'price' in message.content:
+            price = data['prices']['eur']
+            await message.channel.send(price + ' euros')
+        elif 'legal' in message.content:
+            legal = data['legalities']['commander']
+            await message.channel.send(legal)
+        else:
+            image = data['image_uris']['normal']
+            await message.channel.send(image)
     elif '{' and '}' in message.content:
         start = message.content.index('{') + 1
         keyword = message.content[start:message.content.index('}')]
