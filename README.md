@@ -6,14 +6,18 @@ After going through the process of adding the bot to your server (keep in mind t
 
 In the file you will certainly notice there are 2 variables there that seem to come from nowhere, right? Well my friend, that represents the token from the discord bot and the other the name of the server you added the bot to. You will need to add those in the form of a string in a .env file in order for the code to work. To be fair, the only indipensable variableyou need to add is DISCORD_TOKEN. You can always eliminate the section that will need the DISCORD_SERVER variable. 
 
-After all this and installing all the necessary dependencies, you can test the code in the terminal by moving to the directory where the files are located and type ```python3 bot.p```
+After all this and installing all the necessary dependencies, you can test the code in the terminal by moving to the directory where the files are located and type ```python3 bot.py```
 
-Current features:
+Current features
 
     Getting an image of a card by writting its name inside [], curently working for magic: the gathering
 
-Future features:
+    Consult the price and if the card is legal in commander by adding to the message countaining the card name the word price or legal respectively. Ex: typing [Sol Ring] price in the chat will give you the current price of the card in euros.
 
-    Getting the definition of a keyword by writing the name inside []
+    These features were made possible by using the scryfall API
 
-    Cunsulting the price or legality of a card by writing the name of the card and then price or a format name to consult it
+Future features
+
+    Getting the definition of a keyword by writing the name inside {}
+
+    Being able to consult if a card is legal in any format

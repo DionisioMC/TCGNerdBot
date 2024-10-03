@@ -2,6 +2,7 @@ import os
 
 import discord
 import requests
+import random
 from dotenv import load_dotenv
 from bs4 import BeautifulSoup
 
@@ -34,8 +35,11 @@ async def on_message(message):
         card_name = message.content[start:message.content.index(']')].lower()
         api = requests.get(f'https://api.scryfall.com/cards/named?exact={card_name}')
         data = api.json()
-        print(data)
-        if 'price' in message.content:
+        if api.status_code == 404:
+            responses = ["The card doesn't exist, try again, bitch", "You fucked up", "Billions of years of evolution for you to not being able to type a card name correctly? We are doomed...", "Good job buddy, thats not it"]
+            num = random.randint(0, len(responses) - 1)
+            await message.channel.send(responses[num])
+        elif 'price' in message.content:
             price = data['prices']['eur']
             await message.channel.send(price + ' euros')
         elif 'legal' in message.content:
@@ -51,7 +55,7 @@ async def on_message(message):
         page = requests.get(URL)
         wiki = BeautifulSoup(page.content, 'html.parser')
         result = wiki.find('table').prettify()
-        print(result)
         await message.channel.send(result)
+    
     
 client.run(TOKEN)
