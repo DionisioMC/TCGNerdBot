@@ -57,5 +57,8 @@ async def on_message(message):
         result = wiki.find('table').prettify()
         await message.channel.send(result)
     
-    
+    if client.user.mentioned_in(message):
+        await message.channel.send("Batata")
+        
+        
 client.run(TOKEN)
