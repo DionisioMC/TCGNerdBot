@@ -6,6 +6,8 @@ import random
 from dotenv import load_dotenv
 from bs4 import BeautifulSoup
 
+from request_db import get_cards_from_csv, get_cards_from_txt, get_known_owners, request_owners
+
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 GUILD = os.getenv('DISCORD_SERVER')
@@ -58,7 +60,13 @@ async def on_message(message):
         await message.channel.send(result)
     
     if client.user.mentioned_in(message):
-        await message.channel.send("Batata")
+        cards = get_cards_from_txt('Example_request.txt')
+
+        file_path = 'Colections//final_colection.csv'
+        colection = get_cards_from_csv(file_path)
+    
+        get_known_owners(colection)
+        await message.channel.send(request_owners(cards, colection))
         
         
 client.run(TOKEN)

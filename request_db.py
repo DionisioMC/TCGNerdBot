@@ -106,6 +106,7 @@ def request_owners(cards, colection, specific_owner=None):
     """
     list_foundeds = []
     dict_card_by_owners = {}
+    result = ""
     for card in cards:
         list_owners = check_card_in_db(colection, card, specific_owner)
         if not list_owners == []:
@@ -117,9 +118,8 @@ def request_owners(cards, colection, specific_owner=None):
             print(f"{card['Name']} found in the database. Owners: {', '.join(unique_owners)}")
             list_foundeds.append(card['Name'])
     for owner in dict_card_by_owners:
-        print(f"Owner: {owner}, Cards: {', '.join(dict_card_by_owners[owner])}")
-    unique_foundeds = list(set(list_foundeds))
-    print('Cards Foundeds:', unique_foundeds)
+        result += f"Owner: {owner}, Cards: {', '.join(dict_card_by_owners[owner])}\n"
+    return result
 
 def get_known_owners(colection):
     """
