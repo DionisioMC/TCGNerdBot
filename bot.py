@@ -1,4 +1,5 @@
 import os
+from typing import Optional
 
 import discord
 import requests
@@ -10,7 +11,7 @@ from request_db import (get_cards_from_csv, get_cards_from_txt, request_owners,
                         get_set_stats, quick_rarity_comparison_by_owner, analyze_commander_sets_by_owner)
 
 load_dotenv()
-TOKEN = os.getenv('DISCORD_TOKEN')
+TOKEN: Optional[str] = os.getenv('DISCORD_TOKEN')
 GUILD = os.getenv('DISCORD_SERVER')
 
 intent = discord.Intents.default()
@@ -40,23 +41,48 @@ async def on_message(message):
     if '[' and ']' in message.content:
         start = message.content.index('[') + 1
         card_name = message.content[start:message.content.index(']')].lower()
-        api = requests.get(
-            f'https://api.scryfall.com/cards/named?exact={card_name}')
-        data = api.json()
-        if api.status_code == 404:
-            responses = ["The card doesn't exist, try again, bitch", "You fucked up",
-                         "Billions of years of evolution for you to not being able to type a card name correctly? We are doomed...", "Good job buddy, thats not it"]
-            num = random.randint(0, len(responses) - 1)
-            await message.channel.send(responses[num])
-        elif 'price' in message.content:
-            price = data['prices']['eur']
-            await message.channel.send(price + ' euros')
-        elif 'legal' in message.content:
-            legal = data['legalities']['commander']
-            await message.channel.send(legal)
-        else:
-            image = data['image_uris']['normal']
-            await message.channel.send(image)
+
+        try:
+            api = requests.get(
+                f'https://api.scryfall.com/cards/named?exact={card_name}', timeout=10)
+
+            if api.status_code == 404:
+                responses = ["The card doesn't exist, try again, bitch", "You fucked up",
+                             "Billions of years of evolution for you to not being able to type a card name correctly? We are doomed...", "Good job buddy, thats not it"]
+                num = random.randint(0, len(responses) - 1)
+                await message.channel.send(responses[num])
+                return
+            elif api.status_code != 200:
+                await message.channel.send(f"❌ API error: HTTP {api.status_code}")
+                return
+
+            data = api.json()
+
+            if 'price' in message.content:
+                prices = data.get('prices', {})
+                eur_price = prices.get('eur')
+                if eur_price:
+                    await message.channel.send(f"{eur_price} euros")
+                else:
+                    await message.channel.send("❌ EUR price not available for this card")
+            elif 'legal' in message.content:
+                legalities = data.get('legalities', {})
+                commander_legal = legalities.get('commander', 'unknown')
+                await message.channel.send(f"Commander legality: {commander_legal}")
+            else:
+                image_uris = data.get('image_uris', {})
+                image_url = image_uris.get('normal')
+                if image_url:
+                    await message.channel.send(image_url)
+                else:
+                    await message.channel.send("❌ No image available for this card")
+
+        except requests.RequestException as e:
+            await message.channel.send(f"❌ Network error: {str(e)}")
+        except (KeyError, ValueError) as e:
+            await message.channel.send(f"❌ Error parsing card data: {str(e)}")
+        except Exception as e:
+            await message.channel.send(f"❌ Unexpected error: {str(e)}")
 
     # Wiki lookup with {keyword}
     elif '{' and '}' in message.content:
@@ -324,4 +350,7 @@ async def on_message(message):
         await message.channel.send(request_owners(cards, collection, specific_owner=username))
 
 
-client.run(TOKEN)
+if TOKEN:
+    client.run(TOKEN)
+else:
+    print("Error: DISCORD_TOKEN environment variable not set!")

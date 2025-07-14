@@ -8,23 +8,8 @@ def check_card_in_db(db_data, card, owner=None):
 
     Args:
         db_data (list of dict): A list of dictionaries representing the database, 
-                                where each dictionary contains card information.if __name__ == "__main__":
-    cards = get_cards_from_txt('Example_request.txt')
-
-    file_path = 'Colections//final_colection.csv'
-    colection = get_cards_from_csv(file_path)
-
-    # get_known_owners(colection)
-    # request_owners(cards, colection)
-    # # request_owners(cards, colection, specific_owner='XorVitor')
-
-    # Test set statistics
-    set_code = 'FIN'  # Finale Dominaria United
-    set_stats = get_set_stats(set_code)
-
-    # Compare your collection to the set
-    if set_stats:
-        compare_collection_to_set(colection, set_code)rd (dict): A dictionary containing the card details to search for. 
+                                where each dictionary contains card information.
+        card (dict): A dictionary containing the card details to search for. 
                      Must include a 'Name' key.
         owner (str, optional): The owner to filter the search by. Defaults to None.
 
@@ -183,14 +168,31 @@ def get_set_stats(set_code):
     Returns:
         dict: A dictionary containing set statistics including rarity and color breakdowns
     """
-    api = requests.get(f'https://mtgjson.com/api/v5/{set_code}.json')
+    try:
+        api = requests.get(
+            f'https://mtgjson.com/api/v5/{set_code}.json', timeout=10)
 
-    if api.status_code != 200:
-        print(f"Error: Set {set_code} not found or API error.")
+        if api.status_code != 200:
+            print(
+                f"Error: Set {set_code} not found or API error (HTTP {api.status_code}).")
+            return None
+
+        set_data = api.json()['data']
+        cards = set_data.get('cards', [])
+
+        if not cards:
+            print(f"Warning: No cards found for set {set_code}")
+            return None
+
+    except requests.RequestException as e:
+        print(f"Network error fetching set {set_code}: {e}")
         return None
-
-    set_data = api.json()['data']
-    cards = set_data.get('cards', [])
+    except (KeyError, ValueError) as e:
+        print(f"Error parsing data for set {set_code}: {e}")
+        return None
+    except Exception as e:
+        print(f"Unexpected error getting set stats for {set_code}: {e}")
+        return None
 
     # Basic set info
     set_name = set_data.get('name', 'Unknown')
@@ -376,7 +378,7 @@ def get_card_color_identity(card_name, set_code=None):
         else:
             url = f'https://api.scryfall.com/cards/named?exact={card_name}'
 
-        response = requests.get(url)
+        response = requests.get(url, timeout=10)
 
         if response.status_code == 200:
             card_data = response.json()
@@ -384,14 +386,17 @@ def get_card_color_identity(card_name, set_code=None):
         else:
             # If exact match fails, try fuzzy search
             url = f'https://api.scryfall.com/cards/named?fuzzy={card_name}'
-            response = requests.get(url)
+            response = requests.get(url, timeout=10)
             if response.status_code == 200:
                 card_data = response.json()
                 return card_data.get('color_identity', [])
             else:
                 print(
-                    f"Warning: Could not find color identity for '{card_name}'")
+                    f"Warning: Could not find color identity for '{card_name}' (HTTP {response.status_code})")
                 return []
+    except requests.RequestException as e:
+        print(f"Network error getting color identity for '{card_name}': {e}")
+        return []
     except Exception as e:
         print(f"Error getting color identity for '{card_name}': {e}")
         return []
