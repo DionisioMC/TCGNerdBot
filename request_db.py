@@ -160,973 +160,296 @@ def get_cards_of_set(colection, set_name):
 
 def get_set_stats(set_code):
     """
-    Get comprehensive statistics for a Magic: The Gathering set including rarity breakdown and color distribution.
+    Get comprehensive set statistics from the Scryfall API.
 
     Args:
-        set_code (str): The 3-letter set code (e.g., 'FIN', 'MOM', 'ONE')
+        set_code (str): The set code to get statistics for.
 
     Returns:
-        dict: A dictionary containing set statistics including rarity and color breakdowns
+        dict: Dictionary containing set information and statistics, or None if not found.
     """
     try:
         api = requests.get(
-            f'https://mtgjson.com/api/v5/{set_code}.json', timeout=10)
+            f'https://api.scryfall.com/sets/{set_code.lower()}', timeout=10)
+        if api.status_code == 200:
+            set_data = api.json()
 
-        if api.status_code != 200:
-            print(
-                f"Error: Set {set_code} not found or API error (HTTP {api.status_code}).")
-            return None
+            # Get all cards in the set
+            cards_api = requests.get(
+                f'https://api.scryfall.com/cards/search?q=set:{set_code.lower()}', timeout=10)
+            if cards_api.status_code == 200:
+                cards_data = cards_api.json()
 
-        set_data = api.json()['data']
-        cards = set_data.get('cards', [])
+                # Count rarities and colors
+                rarity_breakdown = {'common': 0,
+                                    'uncommon': 0, 'rare': 0, 'mythic': 0}
+                color_breakdown = {'white': 0, 'blue': 0, 'black': 0,
+                                   'red': 0, 'green': 0, 'colorless': 0, 'multicolor': 0}
 
-        if not cards:
-            print(f"Warning: No cards found for set {set_code}")
-            return None
+                for card in cards_data.get('data', []):
+                    # Count rarity
+                    rarity = card.get('rarity', 'unknown')
+                    if rarity in rarity_breakdown:
+                        rarity_breakdown[rarity] += 1
 
-    except requests.RequestException as e:
-        print(f"Network error fetching set {set_code}: {e}")
-        return None
-    except (KeyError, ValueError) as e:
-        print(f"Error parsing data for set {set_code}: {e}")
-        return None
+                    # Count colors
+                    colors = card.get('colors', [])
+                    if not colors:
+                        color_breakdown['colorless'] += 1
+                    elif len(colors) > 1:
+                        color_breakdown['multicolor'] += 1
+                    else:
+                        color_map = {'W': 'white', 'U': 'blue',
+                                     'B': 'black', 'R': 'red', 'G': 'green'}
+                        for color in colors:
+                            if color in color_map:
+                                color_breakdown[color_map[color]] += 1
+
+                return {
+                    'set_info': {
+                        'code': set_data.get('code', '').upper(),
+                        'name': set_data.get('name', ''),
+                        'release_date': set_data.get('released_at', ''),
+                        'total_cards': set_data.get('card_count', 0)
+                    },
+                    'rarity_breakdown': rarity_breakdown,
+                    'color_breakdown': color_breakdown
+                }
     except Exception as e:
-        print(f"Unexpected error getting set stats for {set_code}: {e}")
-        return None
-
-    # Basic set info
-    set_name = set_data.get('name', 'Unknown')
-    release_date = set_data.get('releaseDate', 'Unknown')
-    total_cards = len(cards)
-
-    # Initialize counters
-    rarity_count = {'common': 0, 'uncommon': 0,
-                    'rare': 0, 'mythic': 0, 'special': 0}
-    color_count = {'white': 0, 'blue': 0, 'black': 0,
-                   'red': 0, 'green': 0, 'colorless': 0, 'multicolor': 0}
-    type_count = {'creature': 0, 'instant': 0, 'sorcery': 0, 'enchantment': 0,
-                  'artifact': 0, 'planeswalker': 0, 'land': 0, 'other': 0}
-
-    # Process each card
-    for card in cards:
-        # Count rarities
-        rarity = card.get('rarity', '').lower()
-        if rarity in rarity_count:
-            rarity_count[rarity] += 1
-        else:
-            rarity_count['special'] += 1
-
-        # Count colors
-        colors = card.get('colors', [])
-        if not colors:
-            color_count['colorless'] += 1
-        elif len(colors) == 1:
-            color_map = {'W': 'white', 'U': 'blue',
-                         'B': 'black', 'R': 'red', 'G': 'green'}
-            for color in colors:
-                if color in color_map:
-                    color_count[color_map[color]] += 1
-        else:
-            color_count['multicolor'] += 1
-
-        # Count card types
-        type_line = card.get('type', '').lower()
-        if 'creature' in type_line:
-            type_count['creature'] += 1
-        elif 'instant' in type_line:
-            type_count['instant'] += 1
-        elif 'sorcery' in type_line:
-            type_count['sorcery'] += 1
-        elif 'enchantment' in type_line:
-            type_count['enchantment'] += 1
-        elif 'artifact' in type_line:
-            type_count['artifact'] += 1
-        elif 'planeswalker' in type_line:
-            type_count['planeswalker'] += 1
-        elif 'land' in type_line:
-            type_count['land'] += 1
-        else:
-            type_count['other'] += 1
-
-    # Create results dictionary
-    stats = {
-        'set_info': {
-            'name': set_name,
-            'code': set_code.upper(),
-            'release_date': release_date,
-            'total_cards': total_cards
-        },
-        'rarity_breakdown': rarity_count,
-        'color_breakdown': color_count,
-        'type_breakdown': type_count
-    }
-
-    # Print formatted results
-    print(f"\n=== SET STATISTICS: {set_name} ({set_code.upper()}) ===")
-    print(f"Release Date: {release_date}")
-    print(f"Total Cards: {total_cards}")
-
-    print("\n--- RARITY BREAKDOWN ---")
-    for rarity, count in rarity_count.items():
-        if count > 0:
-            percentage = (count / total_cards) * 100
-            print(f"{rarity.capitalize()}: {count} ({percentage:.1f}%)")
-
-    print("\n--- COLOR BREAKDOWN ---")
-    for color, count in color_count.items():
-        if count > 0:
-            percentage = (count / total_cards) * 100
-            print(f"{color.capitalize()}: {count} ({percentage:.1f}%)")
-
-    print("\n--- TYPE BREAKDOWN ---")
-    for card_type, count in type_count.items():
-        if count > 0:
-            percentage = (count / total_cards) * 100
-            print(f"{card_type.capitalize()}: {count} ({percentage:.1f}%)")
-
-    return stats
-
-
-def compare_collection_to_set(colection, set_code):
-    """
-    Compare your collection to the official set statistics to see completion percentage.
-
-    Args:
-        colection (list): Your card collection from CSV
-        set_code (str): The 3-letter set code to compare against
-
-    Returns:
-        dict: Comparison statistics
-    """
-    # Get official set stats
-    set_stats = get_set_stats(set_code)
-    if not set_stats:
-        return None
-
-    # Get your cards from this set
-    your_cards = get_cards_of_set(colection, set_code)
-
-    if not your_cards:
-        print(
-            f"\nYou don't have any cards from set {set_code} in your collection.")
-        return None
-
-    # Initialize your collection counters
-    your_rarity = {'common': 0, 'uncommon': 0,
-                   'rare': 0, 'mythic': 0, 'special': 0}
-
-    # Count your cards by rarity
-    for card in your_cards:
-        rarity = card.get('Rarity', '').lower()
-        if rarity in your_rarity:
-            your_rarity[rarity] += 1
-        else:
-            your_rarity['special'] += 1
-
-    # Get color breakdown using API calls
-    your_colors = analyze_collection_colors(your_cards)
-
-    # Calculate completion percentages
-    total_you_have = len(your_cards)
-    total_in_set = set_stats['set_info']['total_cards']
-    overall_completion = (total_you_have / total_in_set) * 100
-
-    print(f"\n=== COLLECTION COMPARISON: {set_stats['set_info']['name']} ===")
-    print(
-        f"Your cards: {total_you_have} / {total_in_set} ({overall_completion:.1f}% complete)")
-
-    print("\n--- RARITY COMPLETION ---")
-    for rarity in your_rarity:
-        you_have = your_rarity[rarity]
-        set_has = set_stats['rarity_breakdown'][rarity]
-        if set_has > 0:
-            completion = (you_have / set_has) * 100
-            print(f"{rarity.capitalize()}: {you_have}/{set_has} ({completion:.1f}%)")
-
-    print("\n--- COLOR COMPLETION ---")
-    for color in your_colors:
-        you_have = your_colors[color]
-        set_has = set_stats['color_breakdown'][color]
-        if set_has > 0:
-            completion = (you_have / set_has) * 100
-            print(f"{color.capitalize()}: {you_have}/{set_has} ({completion:.1f}%)")
-
-    return {
-        'your_total': total_you_have,
-        'set_total': total_in_set,
-        'completion_percentage': overall_completion,
-        'your_rarity_breakdown': your_rarity,
-        'your_color_breakdown': your_colors
-    }
-
-
-def get_card_color_identity(card_name, set_code=None):
-    """
-    Get color identity for a card using Scryfall API.
-
-    Args:
-        card_name (str): The name of the card
-        set_code (str, optional): Set code to help with exact matching
-
-    Returns:
-        list: Color identity as list of letters (e.g., ['W', 'U'] for Azorius)
-    """
-    try:
-        # Use exact name search on Scryfall
-        if set_code:
-            url = f'https://api.scryfall.com/cards/named?exact={card_name}&set={set_code}'
-        else:
-            url = f'https://api.scryfall.com/cards/named?exact={card_name}'
-
-        response = requests.get(url, timeout=10)
-
-        if response.status_code == 200:
-            card_data = response.json()
-            return card_data.get('color_identity', [])
-        else:
-            # If exact match fails, try fuzzy search
-            url = f'https://api.scryfall.com/cards/named?fuzzy={card_name}'
-            response = requests.get(url, timeout=10)
-            if response.status_code == 200:
-                card_data = response.json()
-                return card_data.get('color_identity', [])
-            else:
-                print(
-                    f"Warning: Could not find color identity for '{card_name}' (HTTP {response.status_code})")
-                return []
-    except requests.RequestException as e:
-        print(f"Network error getting color identity for '{card_name}': {e}")
-        return []
-    except Exception as e:
-        print(f"Error getting color identity for '{card_name}': {e}")
-        return []
-
-
-def analyze_collection_colors(your_cards):
-    """
-    Analyze color distribution of your collection by fetching color identity from API.
-
-    Args:
-        your_cards (list): List of cards from your collection
-
-    Returns:
-        dict: Color breakdown of your collection
-    """
-    your_colors = {'white': 0, 'blue': 0, 'black': 0,
-                   'red': 0, 'green': 0, 'colorless': 0, 'multicolor': 0}
-
-    print("Analyzing color identity for your cards... (this may take a moment)")
-
-    for i, card in enumerate(your_cards):
-        if i % 10 == 0:  # Progress indicator
-            print(f"Processing card {i+1}/{len(your_cards)}...")
-
-        card_name = card.get('Name', '')
-        set_code = card.get('Set code', '')
-
-        # Get color identity from API
-        color_identity = get_card_color_identity(card_name, set_code)
-
-        # Categorize the card
-        if not color_identity:
-            your_colors['colorless'] += 1
-        elif len(color_identity) == 1:
-            color_map = {'W': 'white', 'U': 'blue',
-                         'B': 'black', 'R': 'red', 'G': 'green'}
-            color = color_identity[0]
-            if color in color_map:
-                your_colors[color_map[color]] += 1
-        else:
-            your_colors['multicolor'] += 1
-
-        # Small delay to be respectful to the API
-        import time
-        time.sleep(0.1)
-
-    return your_colors
-
-
-def quick_rarity_comparison(colection, set_code):
-    """
-    Quick comparison that only analyzes rarity (no API calls needed).
-    Use this for faster analysis when you don't need color data.
-
-    Args:
-        colection (list): Your card collection from CSV
-        set_code (str): The 3-letter set code to compare against
-
-    Returns:
-        dict: Rarity comparison statistics
-    """
-    # Get official set stats
-    set_stats = get_set_stats(set_code)
-    if not set_stats:
-        return None
-
-    # Get your cards from this set
-    your_cards = get_cards_of_set(colection, set_code)
-
-    if not your_cards:
-        print(
-            f"\nYou don't have any cards from set {set_code} in your collection.")
-        return None
-
-    # Initialize your collection counters
-    your_rarity = {'common': 0, 'uncommon': 0,
-                   'rare': 0, 'mythic': 0, 'special': 0}
-
-    # Count your cards by rarity
-    for card in your_cards:
-        rarity = card.get('Rarity', '').lower()
-        if rarity in your_rarity:
-            your_rarity[rarity] += 1
-        else:
-            your_rarity['special'] += 1
-
-    # Calculate completion percentages
-    total_you_have = len(your_cards)
-    total_in_set = set_stats['set_info']['total_cards']
-    overall_completion = (total_you_have / total_in_set) * 100
-
-    print(
-        f"\n=== QUICK RARITY COMPARISON: {set_stats['set_info']['name']} ===")
-    print(
-        f"Your cards: {total_you_have} / {total_in_set} ({overall_completion:.1f}% complete)")
-
-    print("\n--- RARITY COMPLETION ---")
-    for rarity in your_rarity:
-        you_have = your_rarity[rarity]
-        set_has = set_stats['rarity_breakdown'][rarity]
-        if set_has > 0:
-            completion = (you_have / set_has) * 100
-            print(f"{rarity.capitalize()}: {you_have}/{set_has} ({completion:.1f}%)")
-
-    return {
-        'your_total': total_you_have,
-        'set_total': total_in_set,
-        'completion_percentage': overall_completion,
-        'your_rarity_breakdown': your_rarity
-    }
-
-
-def filter_collection_by_owner(collection, owner_name):
-    """
-    Filter collection to only include cards owned by a specific person.
-
-    Args:
-        collection (list): Full collection from CSV
-        owner_name (str): Name of the owner to filter by
-
-    Returns:
-        list: Filtered collection containing only the owner's cards
-    """
-    return [card for card in collection if card.get('Owner', '').lower() == owner_name.lower()]
-
-
-def get_username_from_mention(message_content):
-    """
-    Extract username from Discord message. Handles @mentions and plain usernames.
-
-    Args:
-        message_content (str): Discord message content
-
-    Returns:
-        str: Username or None if not found
-    """
-    import re
-
-    # Look for patterns like "for @username" or "for username"
-    patterns = [
-        r'for\s+@?(\w+)',          # "for @username" or "for username"
-        r'user\s+@?(\w+)',         # "user @username" or "user username"
-        r'owner\s+@?(\w+)',        # "owner @username" or "owner username"
-        r'@(\w+)',                 # Just "@username"
-    ]
-
-    for pattern in patterns:
-        match = re.search(pattern, message_content, re.IGNORECASE)
-        if match:
-            return match.group(1)
+        print(f"Error getting set stats: {e}")
 
     return None
 
 
-def quick_rarity_comparison_by_owner(collection, set_code, owner_name=None):
+def quick_rarity_comparison_by_owner(collection, set_code, owner):
     """
-    Quick comparison that analyzes rarity for a specific owner (no API calls needed).
+    Compare an owner's collection to a specific set with rarity breakdown.
 
     Args:
-        collection (list): Your card collection from CSV
-        set_code (str): The 3-letter set code to compare against
-        owner_name (str, optional): Filter by owner name. If None, uses full collection.
+        collection (list): The collection data
+        set_code (str): The set code to compare against
+        owner (str): The owner to filter by
 
     Returns:
-        dict: Rarity comparison statistics for the owner
+        dict: Comparison results with completion percentages
     """
-    # Filter collection by owner if specified
-    if owner_name:
-        owner_collection = filter_collection_by_owner(collection, owner_name)
-        if not owner_collection:
-            print(
-                f"\nNo cards found for owner '{owner_name}' in the collection.")
+    try:
+        # Get set statistics
+        set_stats = get_set_stats(set_code)
+        if not set_stats:
             return None
-    else:
-        owner_collection = collection
 
-    # Get official set stats
-    set_stats = get_set_stats(set_code)
-    if not set_stats:
+        # Get owner's cards from this set
+        owner_cards = [card for card in collection
+                       if (card.get('Set code', '').lower() == set_code.lower() or
+                           card.get('Set name', '').lower() == set_code.lower())
+                       and card.get('Owner', '') == owner]
+
+        # Count by rarity
+        owner_rarity_breakdown = {'common': 0,
+                                  'uncommon': 0, 'rare': 0, 'mythic': 0}
+        for card in owner_cards:
+            rarity = card.get('Rarity', 'unknown').lower()
+            if rarity in owner_rarity_breakdown:
+                owner_rarity_breakdown[rarity] += 1
+
+        total_owner_cards = len(owner_cards)
+        total_set_cards = set_stats['set_info']['total_cards']
+        completion_percentage = (
+            total_owner_cards / total_set_cards * 100) if total_set_cards > 0 else 0
+
+        return {
+            'set_code': set_code.upper(),
+            'set_name': set_stats['set_info']['name'],
+            'your_total': total_owner_cards,
+            'set_total': total_set_cards,
+            'completion_percentage': completion_percentage,
+            'your_rarity_breakdown': owner_rarity_breakdown,
+            'set_rarity_breakdown': set_stats['rarity_breakdown']
+        }
+    except Exception as e:
+        print(f"Error in quick_rarity_comparison_by_owner: {e}")
         return None
 
-    # Get owner's cards from this set
-    your_cards = get_cards_of_set(owner_collection, set_code)
 
-    if not your_cards:
-        owner_text = f" for {owner_name}" if owner_name else ""
-        print(
-            f"\nNo cards from set {set_code} found{owner_text} in the collection.")
-        return None
-
-    # Initialize your collection counters
-    your_rarity = {'common': 0, 'uncommon': 0,
-                   'rare': 0, 'mythic': 0, 'special': 0}
-
-    # Count your cards by rarity
-    for card in your_cards:
-        rarity = card.get('Rarity', '').lower()
-        if rarity in your_rarity:
-            your_rarity[rarity] += 1
-        else:
-            your_rarity['special'] += 1
-
-    # Calculate completion percentages
-    total_you_have = len(your_cards)
-    total_in_set = set_stats['set_info']['total_cards']
-    overall_completion = (total_you_have / total_in_set) * 100
-
-    owner_text = f" ({owner_name})" if owner_name else ""
-    print(
-        f"\n=== QUICK RARITY COMPARISON: {set_stats['set_info']['name']}{owner_text} ===")
-    print(
-        f"Cards: {total_you_have} / {total_in_set} ({overall_completion:.1f}% complete)")
-
-    print("\n--- RARITY COMPLETION ---")
-    for rarity in your_rarity:
-        you_have = your_rarity[rarity]
-        set_has = set_stats['rarity_breakdown'][rarity]
-        if set_has > 0:
-            completion = (you_have / set_has) * 100
-            print(f"{rarity.capitalize()}: {you_have}/{set_has} ({completion:.1f}%)")
-
-    return {
-        'your_total': total_you_have,
-        'set_total': total_in_set,
-        'completion_percentage': overall_completion,
-        'your_rarity_breakdown': your_rarity,
-        'owner_name': owner_name
-    }
-
-
-def analyze_commander_sets(colection, target_sets=None):
+def analyze_commander_sets_by_owner(collection, owner):
     """
-    Analyze multiple sets to recommend which ones to focus on for Commander format.
+    Analyze which sets would be best for Commander format based on owner's collection.
 
     Args:
-        colection (list): Your card collection from CSV
-        target_sets (list, optional): Specific sets to analyze. If None, analyzes popular Commander sets.
+        collection (list): The collection data
+        owner (str): The owner to analyze
 
     Returns:
-        dict: Analysis results with recommendations
+        list: List of set recommendations sorted by score
     """
-    # Comprehensive Commander sets (recent and classic)
-    if target_sets is None:
-        target_sets = [
-            # Recent High-Power Sets (2023-2025)
-            'MH3',  # Modern Horizons 3 - High power level
-            'BLB',  # Bloomburrow - Animal tribal
-            'OTJ',  # Outlaws of Thunder Junction - Crime themes
-            'MKM',  # Murders at Karlov Manor - Detective themes
-            'LCI',  # Lost Caverns of Ixalan - Tribal support
-            'WOE',  # Wilds of Eldraine - Adventure mechanics
-            'LTR',  # Lord of the Rings - Commander popular
-            'MOM',  # March of the Machine - Multiverse
-            'ONE',  # Phyrexia: All Will Be One - High power
+    try:
+        # Get all unique sets in owner's collection
+        owner_sets = set()
+        for card in collection:
+            if card.get('Owner', '') == owner:
+                set_code = card.get('Set code', '')
+                if set_code:
+                    owner_sets.add(set_code)
 
-            # Commander Products & Legends Sets
-            'CLB',  # Commander Legends: Battle for Baldur's Gate
-            'NCC',  # New Capenna Commander
-            'AFC',  # Adventures in the Forgotten Realms Commander
-            'C21',  # Commander 2021
-            'CMR',  # Commander Legends
-            'C20',  # Commander 2020
-            'C19',  # Commander 2019
+        recommendations = []
 
-            # Artifact & Historic Sets
-            'BRO',  # The Brothers' War - Artifacts matter
-            'NEO',  # Kamigawa: Neon Dynasty - Artifacts & enchantments
-            'DMU',  # Dominaria United - Legends/Historic
-            'DOM',  # Dominaria - Historic matters
-            'KLD',  # Kaladesh - Artifacts & energy
-            'AER',  # Aether Revolt - Artifacts
-
-            # Multicolor & Guild Sets
-            'SNC',  # Streets of New Capenna - 3-color families
-            'GRN',  # Guilds of Ravnica
-            'RNA',  # Ravnica Allegiance
-            'WAR',  # War of the Spark - Planeswalkers
-            'RTR',  # Return to Ravnica
-            'GTC',  # Gatecrash
-            'DGM',  # Dragon's Maze
-
-            # Tribal & Theme Sets
-            'IXL',  # Ixalan - Pirates, Vampires, Merfolk, Dinosaurs
-            'RIX',  # Rivals of Ixalan
-            'ISD',  # Innistrad - Humans, Zombies, Spirits
-            'DKA',  # Dark Ascension
-            'SOI',  # Shadows over Innistrad
-            'EMN',  # Eldritch Moon
-            'MID',  # Innistrad: Midnight Hunt
-            'VOW',  # Innistrad: Crimson Vow
-            'ZEN',  # Zendikar - Landfall
-            'WWK',  # Worldwake
-            'ROE',  # Rise of the Eldrazi
-            'BFZ',  # Battle for Zendikar
-            'OGW',  # Oath of the Gatewatch
-            'ZNR',  # Zendikar Rising
-
-            # High-Power Modern Sets
-            'MH2',  # Modern Horizons 2
-            'MH1',  # Modern Horizons
-            'TSR',  # Time Spiral Remastered
-            'UMA',  # Ultimate Masters
-            'MM3',  # Modern Masters 2017
-            'EMA',  # Eternal Masters
-
-            # Specialty & Supplemental
-            'CNS',  # Conspiracy
-            'CN2',  # Conspiracy: Take the Crown
-            'BBD',  # Battlebond - Partner mechanics
-            '2X2',  # Double Masters 2022
-            '2XM',  # Double Masters
-            'JMP',  # Jumpstart
-
-            # Wedge & Shard Sets
-            'KTK',  # Khans of Tarkir - 3-color wedges
-            'FRF',  # Fate Reforged
-            'DTK',  # Dragons of Tarkir
-            'ALA',  # Shards of Alara
-            'CON',  # Conflux
-            'ARB',  # Alara Reborn
-
-            # Enchantment & God Sets
-            'THS',  # Theros - Enchantments matter
-            'BNG',  # Born of the Gods
-            'JOU',  # Journey into Nyx
-            'THB',  # Theros Beyond Death
-
-            # Recent Standard with Commander Appeal
-            'ELD',  # Throne of Eldraine
-            'STX',  # Strixhaven - Spells matter
-            'AFR',  # Adventures in the Forgotten Realms
-            'KHM',  # Kaldheim - Norse mythology
-        ]
-
-    print("=== COMMANDER SET ANALYSIS ===")
-    print("Analyzing sets for Commander format potential...\n")
-
-    results = []
-
-    for set_code in target_sets:
-        try:
-            # Get set stats
-            set_stats = get_set_stats(set_code)
-            if not set_stats:
-                continue
-
-            # Get your cards from this set
-            your_cards = get_cards_of_set(colection, set_code)
-
-            if not your_cards:
-                completion_rate = 0
-                rare_mythic_completion = 0
-                total_you_have = 0
-            else:
-                # Calculate completion rates
-                total_you_have = len(your_cards)
-                total_in_set = set_stats['set_info']['total_cards']
-                completion_rate = (total_you_have / total_in_set) * 100
-
-                # Focus on rares and mythics for Commander
-                your_rare_mythic = sum(1 for card in your_cards
-                                       if card.get('Rarity', '').lower() in ['rare', 'mythic'])
-                set_rare_mythic = set_stats['rarity_breakdown']['rare'] + \
-                    set_stats['rarity_breakdown']['mythic']
+        for set_code in owner_sets:
+            comparison = quick_rarity_comparison_by_owner(
+                collection, set_code, owner)
+            if comparison:
+                # Calculate Commander score based on rare/mythic completion
+                rare_mythic_owned = comparison['your_rarity_breakdown']['rare'] + \
+                    comparison['your_rarity_breakdown']['mythic']
+                rare_mythic_total = comparison['set_rarity_breakdown']['rare'] + \
+                    comparison['set_rarity_breakdown']['mythic']
                 rare_mythic_completion = (
-                    your_rare_mythic / set_rare_mythic * 100) if set_rare_mythic > 0 else 0
+                    rare_mythic_owned / rare_mythic_total * 100) if rare_mythic_total > 0 else 0
 
-            # Commander relevance scoring
-            commander_score = calculate_commander_score(set_stats, set_code)
+                # Simple scoring algorithm (can be improved)
+                commander_score = min(
+                    10, (rare_mythic_completion / 10) + (comparison['completion_percentage'] / 20))
+                recommendation_score = (
+                    rare_mythic_completion * 0.6) + (comparison['completion_percentage'] * 0.4)
 
-            results.append({
-                'set_code': set_code,
-                'set_name': set_stats['set_info']['name'],
-                'release_date': set_stats['set_info']['release_date'],
-                'total_cards': set_stats['set_info']['total_cards'],
-                'your_cards': total_you_have,
-                'completion_rate': completion_rate,
-                'rare_mythic_completion': rare_mythic_completion,
-                'commander_score': commander_score,
-                'recommendation_score': calculate_recommendation_score(completion_rate, rare_mythic_completion, commander_score)
-            })
+                recommendations.append({
+                    'set_code': comparison['set_code'],
+                    'set_name': comparison['set_name'],
+                    'completion_rate': comparison['completion_percentage'],
+                    'rare_mythic_completion': rare_mythic_completion,
+                    'commander_score': round(commander_score, 1),
+                    'recommendation_score': round(recommendation_score, 1)
+                })
 
-        except Exception as e:
-            print(f"Error analyzing set {set_code}: {e}")
-            continue
+        # Sort by recommendation score
+        return sorted(recommendations, key=lambda x: x['recommendation_score'], reverse=True)
 
-    # Sort by recommendation score
-    results.sort(key=lambda x: x['recommendation_score'], reverse=True)
-
-    # Display results
-    print("=" * 80)
-    print(f"{'SET':<8} {'NAME':<25} {'COMPLETE':<10} {'R/M%':<8} {'CMD':<5} {'SCORE':<7} {'RECOMMENDATION'}")
-    print("=" * 80)
-
-    for result in results:
-        recommendation = get_recommendation_text(
-            result['recommendation_score'])
-        print(f"{result['set_code']:<8} {result['set_name'][:24]:<25} "
-              f"{result['completion_rate']:.1f}%{'':<5} {result['rare_mythic_completion']:.1f}%{'':<4} "
-              f"{result['commander_score']:<5} {result['recommendation_score']:.1f}{'':<4} {recommendation}")
-
-    print("\n=== TOP 3 RECOMMENDATIONS FOR COMMANDER ===")
-    for i, result in enumerate(results[:3], 1):
-        print(f"\n{i}. {result['set_name']} ({result['set_code']})")
-        print(f"   • Overall completion: {result['completion_rate']:.1f}%")
-        print(
-            f"   • Rare/Mythic completion: {result['rare_mythic_completion']:.1f}%")
-        print(f"   • Commander relevance: {result['commander_score']}/10")
-        print(
-            f"   • Why: {get_detailed_recommendation(result['set_code'], result)}")
-
-    return results
+    except Exception as e:
+        print(f"Error in analyze_commander_sets_by_owner: {e}")
+        return []
 
 
-def analyze_commander_sets_by_owner(collection, owner_name=None, target_sets=None):
+def get_all_sets_in_collection(collection):
     """
-    Analyze multiple sets to recommend which ones to focus on for Commander format (filtered by owner).
+    Get all unique sets present in the collection.
 
     Args:
-        collection (list): Your card collection from CSV
-        owner_name (str, optional): Filter by owner name. If None, uses full collection.
-        target_sets (list, optional): Specific sets to analyze. If None, analyzes popular Commander sets.
+        collection (list): The collection data
 
     Returns:
-        dict: Analysis results with recommendations for the specific owner
+        list: List of dictionaries with set information
     """
-    # Filter collection by owner if specified
-    if owner_name:
-        owner_collection = filter_collection_by_owner(collection, owner_name)
-        if not owner_collection:
-            print(
-                f"\nNo cards found for owner '{owner_name}' in the collection.")
-            return None
-        print(f"=== COMMANDER SET ANALYSIS FOR {owner_name.upper()} ===")
-    else:
-        owner_collection = collection
-        print("=== COMMANDER SET ANALYSIS ===")
+    sets_dict = {}
 
-    # Comprehensive Commander sets (recent and classic)
-    if target_sets is None:
-        target_sets = [
-            # Recent High-Power Sets (2023-2025)
-            'MH3',  # Modern Horizons 3 - High power level
-            'BLB',  # Bloomburrow - Animal tribal
-            'OTJ',  # Outlaws of Thunder Junction - Crime themes
-            'MKM',  # Murders at Karlov Manor - Detective themes
-            'LCI',  # Lost Caverns of Ixalan - Tribal support
-            'WOE',  # Wilds of Eldraine - Adventure mechanics
-            'LTR',  # Lord of the Rings - Commander popular
-            'MOM',  # March of the Machine - Multiverse
-            'ONE',  # Phyrexia: All Will Be One - High power
+    for card in collection:
+        set_code = card.get('Set code', '')
+        set_name = card.get('Set name', '')
 
-            # Commander Products & Legends Sets
-            'CLB',  # Commander Legends: Battle for Baldur's Gate
-            'NCC',  # New Capenna Commander
-            'AFC',  # Adventures in the Forgotten Realms Commander
-            'C21',  # Commander 2021
-            'CMR',  # Commander Legends
-            'C20',  # Commander 2020
-            'C19',  # Commander 2019
+        if set_code and set_code not in sets_dict:
+            sets_dict[set_code] = {
+                'code': set_code,
+                'name': set_name,
+                'card_count': 0
+            }
 
-            # Artifact & Historic Sets
-            'BRO',  # The Brothers' War - Artifacts matter
-            'NEO',  # Kamigawa: Neon Dynasty - Artifacts & enchantments
-            'DMU',  # Dominaria United - Legends/Historic
-            'DOM',  # Dominaria - Historic matters
-            'KLD',  # Kaladesh - Artifacts & energy
-            'AER',  # Aether Revolt - Artifacts
+        if set_code in sets_dict:
+            sets_dict[set_code]['card_count'] += int(card.get('Quantity', 1))
 
-            # Multicolor & Guild Sets
-            'SNC',  # Streets of New Capenna - 3-color families
-            'GRN',  # Guilds of Ravnica
-            'RNA',  # Ravnica Allegiance
-            'WAR',  # War of the Spark - Planeswalkers
-            'RTR',  # Return to Ravnica
-            'GTC',  # Gatecrash
-            'DGM',  # Dragon's Maze
-
-            # Tribal & Theme Sets
-            'IXL',  # Ixalan - Pirates, Vampires, Merfolk, Dinosaurs
-            'RIX',  # Rivals of Ixalan
-            'ISD',  # Innistrad - Humans, Zombies, Spirits
-            'DKA',  # Dark Ascension
-            'SOI',  # Shadows over Innistrad
-            'EMN',  # Eldritch Moon
-            'MID',  # Innistrad: Midnight Hunt
-            'VOW',  # Innistrad: Crimson Vow
-            'ZEN',  # Zendikar - Landfall
-            'WWK',  # Worldwake
-            'ROE',  # Rise of the Eldrazi
-            'BFZ',  # Battle for Zendikar
-            'OGW',  # Oath of the Gatewatch
-            'ZNR',  # Zendikar Rising
-
-            # High-Power Modern Sets
-            'MH2',  # Modern Horizons 2
-            'MH1',  # Modern Horizons
-            'TSR',  # Time Spiral Remastered
-            'UMA',  # Ultimate Masters
-            'MM3',  # Modern Masters 2017
-            'EMA',  # Eternal Masters
-
-            # Specialty & Supplemental
-            'CNS',  # Conspiracy
-            'CN2',  # Conspiracy: Take the Crown
-            'BBD',  # Battlebond - Partner mechanics
-            '2X2',  # Double Masters 2022
-            '2XM',  # Double Masters
-            'JMP',  # Jumpstart
-
-            # Wedge & Shard Sets
-            'KTK',  # Khans of Tarkir - 3-color wedges
-            'FRF',  # Fate Reforged
-            'DTK',  # Dragons of Tarkir
-            'ALA',  # Shards of Alara
-            'CON',  # Conflux
-            'ARB',  # Alara Reborn
-
-            # Enchantment & God Sets
-            'THS',  # Theros - Enchantments matter
-            'BNG',  # Born of the Gods
-            'JOU',  # Journey into Nyx
-            'THB',  # Theros Beyond Death
-
-            # Recent Standard with Commander Appeal
-            'ELD',  # Throne of Eldraine
-            'STX',  # Strixhaven - Spells matter
-            'AFR',  # Adventures in the Forgotten Realms
-            'KHM',  # Kaldheim - Norse mythology
-        ]
-
-    print("Analyzing sets for Commander format potential...\n")
-
-    results = []
-
-    for set_code in target_sets:
-        try:
-            # Get set stats (suppress output by capturing it)
-            import io
-            import sys
-            old_stdout = sys.stdout
-            sys.stdout = io.StringIO()
-
-            set_stats = get_set_stats(set_code)
-
-            sys.stdout = old_stdout  # Restore stdout
-
-            if not set_stats:
-                continue
-
-            # Get owner's cards from this set
-            your_cards = get_cards_of_set(owner_collection, set_code)
-
-            if not your_cards:
-                completion_rate = 0
-                rare_mythic_completion = 0
-                total_you_have = 0
-            else:
-                # Calculate completion rates
-                total_you_have = len(your_cards)
-                total_in_set = set_stats['set_info']['total_cards']
-                completion_rate = (total_you_have / total_in_set) * 100
-
-                # Focus on rares and mythics for Commander
-                your_rare_mythic = sum(1 for card in your_cards
-                                       if card.get('Rarity', '').lower() in ['rare', 'mythic'])
-                set_rare_mythic = set_stats['rarity_breakdown']['rare'] + \
-                    set_stats['rarity_breakdown']['mythic']
-                rare_mythic_completion = (
-                    your_rare_mythic / set_rare_mythic * 100) if set_rare_mythic > 0 else 0
-
-            # Commander relevance scoring
-            commander_score = calculate_commander_score(set_stats, set_code)
-
-            results.append({
-                'set_code': set_code,
-                'set_name': set_stats['set_info']['name'],
-                'release_date': set_stats['set_info']['release_date'],
-                'total_cards': set_stats['set_info']['total_cards'],
-                'your_cards': total_you_have,
-                'completion_rate': completion_rate,
-                'rare_mythic_completion': rare_mythic_completion,
-                'commander_score': commander_score,
-                'recommendation_score': calculate_recommendation_score(completion_rate, rare_mythic_completion, commander_score)
-            })
-
-        except Exception as e:
-            print(f"Error analyzing set {set_code}: {e}")
-            continue
-
-    # Sort by recommendation score
-    results.sort(key=lambda x: x['recommendation_score'], reverse=True)
-
-    # Display results
-    owner_text = f" FOR {owner_name.upper()}" if owner_name else ""
-    print("=" * 80)
-    print(f"{'SET':<8} {'NAME':<25} {'COMPLETE':<10} {'R/M%':<8} {'CMD':<5} {'SCORE':<7} {'RECOMMENDATION'}")
-    print("=" * 80)
-
-    for result in results:
-        recommendation = get_recommendation_text(
-            result['recommendation_score'])
-        print(f"{result['set_code']:<8} {result['set_name'][:24]:<25} "
-              f"{result['completion_rate']:.1f}%{'':<5} {result['rare_mythic_completion']:.1f}%{'':<4} "
-              f"{result['commander_score']:<5} {result['recommendation_score']:.1f}{'':<4} {recommendation}")
-
-    print(f"\n=== TOP 3 RECOMMENDATIONS FOR COMMANDER{owner_text} ===")
-    for i, result in enumerate(results[:3], 1):
-        print(f"\n{i}. {result['set_name']} ({result['set_code']})")
-        print(f"   • Overall completion: {result['completion_rate']:.1f}%")
-        print(
-            f"   • Rare/Mythic completion: {result['rare_mythic_completion']:.1f}%")
-        print(f"   • Commander relevance: {result['commander_score']}/10")
-        print(
-            f"   • Why: {get_detailed_recommendation(result['set_code'], result)}")
-
-    return results
+    return list(sets_dict.values())
 
 
-def calculate_commander_score(set_stats, set_code):
+def compare_all_sets_by_owner(collection, owner):
     """
-    Calculate a Commander format relevance score (1-10) based on set characteristics.
+    Compare an owner's collection completion rate across all sets they own cards from.
+
+    Args:
+        collection (list): The collection data
+        owner (str): The owner to analyze
+
+    Returns:
+        list: List of set comparisons sorted by completion percentage
     """
-    score = 5  # Base score
+    try:
+        # Get all sets in the owner's collection
+        owner_sets = set()
+        for card in collection:
+            if card.get('Owner', '') == owner:
+                set_code = card.get('Set code', '')
+                if set_code:
+                    owner_sets.add(set_code)
 
-    # Higher scores for sets known to be Commander-relevant
-    commander_sets = {
-        'MH3': 9,   # Modern Horizons - always high power
-        'LTR': 9,   # LOTR - extremely popular in Commander
-        'CLB': 10,  # Commander Legends - designed for Commander
-        'NCC': 9,   # Commander product
-        'LCI': 8,   # Ixalan tribal themes
-        'MOM': 8,   # Multiverse themes
-        'ONE': 8,   # High power Phyrexian cards
-        'WOE': 7,   # Adventure mechanics
-        'BRO': 7,   # Artifact themes
-        'DMU': 8,   # Legendary matters
-    }
+        comparisons = []
 
-    if set_code in commander_sets:
-        score = commander_sets[set_code]
+        for set_code in owner_sets:
+            comparison = quick_rarity_comparison_by_owner(
+                collection, set_code, owner)
+            if comparison:
+                comparisons.append(comparison)
 
-    # Adjust based on multicolor percentage (Commander loves multicolor)
-    multicolor_pct = (set_stats['color_breakdown']['multicolor'] /
-                      set_stats['set_info']['total_cards']) * 100
-    if multicolor_pct > 20:
-        score += 1
-    elif multicolor_pct > 15:
-        score += 0.5
+        # Sort by completion percentage
+        return sorted(comparisons, key=lambda x: x['completion_percentage'], reverse=True)
 
-    # Adjust based on legendary/artifact density (rough approximation)
-    creature_pct = (set_stats['type_breakdown'].get(
-        'creature', 0) / set_stats['set_info']['total_cards']) * 100
-    if creature_pct > 60:  # Creature-heavy sets often good for Commander
-        score += 0.5
-
-    return min(10, max(1, score))
+    except Exception as e:
+        print(f"Error in compare_all_sets_by_owner: {e}")
+        return []
 
 
-def calculate_recommendation_score(completion_rate, rare_mythic_completion, commander_score):
+def compare_top_sets_by_owner(collection, owner, top_count=15):
     """
-    Calculate an overall recommendation score for focusing on a set.
-    Higher score = better target for investment.
+    Compare an owner's collection completion rate for their top sets only.
+    This is much faster than analyzing all sets.
+
+    Args:
+        collection (list): The collection data
+        owner (str): The owner to analyze
+        top_count (int): Number of top sets to analyze (default: 15)
+
+    Returns:
+        list: List of set comparisons sorted by completion percentage
     """
-    # Lower completion = higher potential gain
-    completion_factor = max(0, 100 - completion_rate) / 100
+    try:
+        # First, count cards per set for this owner (fast operation)
+        set_card_counts = {}
+        for card in collection:
+            if card.get('Owner', '') == owner:
+                set_code = card.get('Set code', '')
+                if set_code:
+                    if set_code not in set_card_counts:
+                        set_card_counts[set_code] = {
+                            'count': 0,
+                            'set_name': card.get('Set name', set_code)
+                        }
+                    set_card_counts[set_code]['count'] += 1
 
-    # Lower rare/mithic completion = higher potential for valuable cards
-    rare_mythic_factor = max(0, 100 - rare_mythic_completion) / 100
+        # Get top sets by card count
+        top_sets = sorted(set_card_counts.items(),
+                          key=lambda x: x[1]['count'],
+                          reverse=True)[:top_count]
 
-    # Commander relevance multiplier
-    commander_factor = commander_score / 10
+        # Only do detailed comparison for top sets
+        comparisons = []
+        for set_code, _ in top_sets:
+            comparison = quick_rarity_comparison_by_owner(
+                collection, set_code, owner)
+            if comparison:
+                comparisons.append(comparison)
 
-    # Weighted score: 40% completion gap, 40% rare/mythic gap, 20% commander relevance
-    score = (completion_factor * 4 + rare_mythic_factor *
-             4 + commander_factor * 2) * 10
+        # Sort by completion percentage
+        return sorted(comparisons, key=lambda x: x['completion_percentage'], reverse=True)
 
-    return score
-
-
-def get_recommendation_text(score):
-    """Get recommendation text based on score."""
-    if score >= 8:
-        return "🔥 PRIORITY"
-    elif score >= 6:
-        return "⭐ GOOD TARGET"
-    elif score >= 4:
-        return "✓ CONSIDER"
-    else:
-        return "• LOW PRIORITY"
-
-
-def get_detailed_recommendation(set_code, result):
-    """Get detailed recommendation text for a set."""
-    reasons = {
-        'MH3': "Extremely high power level cards, many Commander staples",
-        'LTR': "Massively popular in Commander, unique mechanics and themes",
-        'CLB': "Designed specifically for Commander format",
-        'NCC': "Commander precon cards, many format staples",
-        'LCI': "Strong tribal themes (Dinosaurs, Pirates, Merfolk, Vampires)",
-        'MOM': "Multiverse cards, high power level, planeswalker density",
-        'ONE': "Phyrexian mana and toxic mechanics, very powerful cards",
-        'WOE': "Adventure mechanics and enchantment themes",
-        'BRO': "Artifact-heavy set, great for artifact commanders",
-        'DMU': "Legendary matters, historic themes, domain mechanics"
-    }
-
-    base_reason = reasons.get(set_code, "Good power level for Commander")
-
-    if result['completion_rate'] < 20:
-        return f"{base_reason}. Low completion means high potential gains."
-    elif result['rare_mythic_completion'] < 15:
-        return f"{base_reason}. Missing most rare/mythic cards."
-    else:
-        return f"{base_reason}. Good foundation to build upon."
+    except Exception as e:
+        print(f"Error in compare_top_sets_by_owner: {e}")
+        return []
 
 
 if __name__ == "__main__":
-    # cards = get_cards_from_txt('Example_request.txt')
+    cards = get_cards_from_txt('Example_request.txt')
 
-    file_path = 'Collections/final_collection.csv'
+    file_path = 'Colections//final_colection.csv'
     colection = get_cards_from_csv(file_path)
 
     # get_known_owners(colection)
     # request_owners(cards, colection)
     # # request_owners(cards, colection, specific_owner='XorVitor')
 
-    # Commander set analysis
-    print("Analyzing your collection for Commander format recommendations...")
-    analyze_commander_sets(colection)
-
-    # Analyze Commander sets
-    analyze_commander_sets(colection)
+    get_set_stats('FIN')

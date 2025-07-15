@@ -8,7 +8,8 @@ from dotenv import load_dotenv
 from bs4 import BeautifulSoup
 
 from request_db import (get_cards_from_csv, get_cards_from_txt, request_owners,
-                        get_set_stats, quick_rarity_comparison_by_owner, analyze_commander_sets_by_owner)
+                        get_set_stats, quick_rarity_comparison_by_owner, analyze_commander_sets_by_owner,
+                        compare_top_sets_by_owner)
 
 load_dotenv()
 TOKEN: Optional[str] = os.getenv('DISCORD_TOKEN')
@@ -16,7 +17,7 @@ GUILD = os.getenv('DISCORD_SERVER')
 
 intent = discord.Intents.default()
 intent.message_content = True
-intent.members = True
+# intent.members = True  # Disabled - requires privileged intent
 
 client = discord.Client(intents=intent)
 
@@ -24,7 +25,7 @@ client = discord.Client(intents=intent)
 @client.event
 async def on_ready():
 
-    guild = discord.utils.get(client.guilds, name=GUILD)
+    guild = discord.utils.get(client.guilds, id=int(GUILD))
 
     print(
         f'{client.user} is connected to the following guild:\n'
@@ -210,50 +211,6 @@ async def on_message(message):
         except Exception as e:
             await message.channel.send(f"❌ Error analyzing set: {str(e)}")
 
-    # Collection comparison command: !compare <SET_CODE>
-    elif message.content.startswith('!compare'):
-        try:
-            parts = message.content.split()
-            set_code = parts[1].upper()
-
-            # Always use the message author's Discord username (no access to other users)
-            username = str(message.author.display_name)
-            await message.channel.send(f"🔍 Comparing **your** collection to **{set_code}**...")
-
-            # Load collection
-            file_path = 'Collections/final_collection.csv'
-            collection = get_cards_from_csv(file_path)
-
-            # Get comparison with owner filtering
-            comparison = quick_rarity_comparison_by_owner(
-                collection, set_code, username)
-
-            if comparison:
-                embed = discord.Embed(
-                    title=f"🔍 Collection Comparison: {set_code}",
-                    color=0xff9900,
-                    description=f"**Your** progress: **{comparison['your_total']} / {comparison['set_total']} cards ({comparison['completion_percentage']:.1f}% complete)**"
-                )
-
-                # Rarity completion
-                rarity_text = ""
-                for rarity, count in comparison['your_rarity_breakdown'].items():
-                    if count > 0:
-                        rarity_text += f"**{rarity.capitalize()}:** {count} cards\n"
-
-                embed.add_field(name="🎴 Collection by Rarity",
-                                value=rarity_text or "No cards found", inline=True)
-                embed.add_field(
-                    name="💡 Tip", value="Use `!commander` for personalized recommendations!", inline=False)
-
-                await message.channel.send(embed=embed)
-            else:
-                await message.channel.send(f"❌ **You** don't have any cards from set **{set_code}** or set not found.")
-        except IndexError:
-            await message.channel.send("❌ Please provide a set code! Usage: `!compare <SET_CODE>`\nExample: `!compare OTJ`")
-        except Exception as e:
-            await message.channel.send(f"❌ Error comparing collection: {str(e)}")
-
     # Commander analysis command: !commander
     elif message.content.startswith('!commander'):
         try:
@@ -298,6 +255,121 @@ async def on_message(message):
         except Exception as e:
             await message.channel.send(f"❌ Error with Commander analysis: {str(e)}")
 
+    # Compare all sets command: !compareall
+    elif message.content.startswith('!compareall'):
+        try:
+            # Always use the message author's Discord username
+            username = str(message.author.display_name)
+            await message.channel.send("📊 Analyzing **your** top collection sets...")
+
+            # Load collection
+            file_path = 'Collections/final_collection.csv'
+            collection = get_cards_from_csv(file_path)
+
+            # Get comparison for top 15 sets with owner filtering (optimized)
+            comparisons = compare_top_sets_by_owner(
+                collection, username, top_count=15)
+
+            if comparisons:
+                embed = discord.Embed(
+                    title=f"📊 Collection Overview for {username}",
+                    color=0x00d4aa,
+                    description=f"Your top collection sets (showing up to {len(comparisons)} sets)"
+                )
+
+                # Show top 10 sets by completion
+                top_sets = comparisons[:10]
+
+                completion_text = ""
+                for i, comp in enumerate(top_sets, 1):
+                    # Add completion emoji
+                    if comp['completion_percentage'] >= 50:
+                        emoji = "🎯"
+                    elif comp['completion_percentage'] >= 25:
+                        emoji = "📈"
+                    elif comp['completion_percentage'] >= 10:
+                        emoji = "📊"
+                    else:
+                        emoji = "📋"
+
+                    completion_text += f"{emoji} **{comp['set_name']} ({comp['set_code']})**\n"
+                    completion_text += f"└ {comp['your_total']}/{comp['set_total']} cards ({comp['completion_percentage']:.1f}%)\n\n"
+
+                embed.add_field(
+                    name="🏆 Top Sets by Completion",
+                    value=completion_text[:1000] +
+                    ("..." if len(completion_text) > 1000 else ""),
+                    inline=False
+                )
+
+                # Calculate overall stats
+                total_owned = sum(comp['your_total'] for comp in comparisons)
+                total_possible = sum(comp['set_total'] for comp in comparisons)
+                overall_completion = (
+                    total_owned / total_possible * 100) if total_possible > 0 else 0
+
+                embed.add_field(
+                    name="📈 Overall Statistics",
+                    value=f"**Total Cards:** {total_owned:,}\n**Overall Completion:** {overall_completion:.1f}%\n**Sets with 50%+ completion:** {len([c for c in comparisons if c['completion_percentage'] >= 50])}",
+                    inline=True
+                )
+
+                embed.add_field(
+                    name="💡 Quick Actions",
+                    value="Use `!compare <SET>` for detailed set analysis\nUse `!commander` for format recommendations",
+                    inline=True
+                )
+
+                await message.channel.send(embed=embed)
+            else:
+                await message.channel.send("❌ No collection data found for **you**.")
+        except Exception as e:
+            await message.channel.send(f"❌ Error analyzing your collection: {str(e)}")
+
+    # Collection comparison command: !compare <SET_CODE>
+    elif message.content.startswith('!compare'):
+        try:
+            parts = message.content.split()
+            set_code = parts[1].upper()
+
+            # Always use the message author's Discord username (no access to other users)
+            username = str(message.author.display_name)
+            await message.channel.send(f"🔍 Comparing **your** collection to **{set_code}**...")
+
+            # Load collection
+            file_path = 'Collections/final_collection.csv'
+            collection = get_cards_from_csv(file_path)
+
+            # Get comparison with owner filtering
+            comparison = quick_rarity_comparison_by_owner(
+                collection, set_code, username)
+
+            if comparison:
+                embed = discord.Embed(
+                    title=f"🔍 Collection Comparison: {set_code}",
+                    color=0xff9900,
+                    description=f"**Your** progress: **{comparison['your_total']} / {comparison['set_total']} cards ({comparison['completion_percentage']:.1f}% complete)**"
+                )
+
+                # Rarity completion
+                rarity_text = ""
+                for rarity, count in comparison['your_rarity_breakdown'].items():
+                    if count > 0:
+                        rarity_text += f"**{rarity.capitalize()}:** {count} cards\n"
+
+                embed.add_field(name="🎴 Collection by Rarity",
+                                value=rarity_text or "No cards found", inline=True)
+                embed.add_field(
+                    name="💡 Tip", value="Use `!commander` for personalized recommendations!", inline=False)
+
+                await message.channel.send(embed=embed)
+            else:
+                await message.channel.send(f"❌ **You** don't have any cards from set **{set_code}** or set not found.")
+        except IndexError:
+            await message.channel.send("❌ Please provide a set code! Usage: `!compare <SET_CODE>`\nExample: `!compare OTJ`")
+        except Exception as e:
+            await message.channel.send(f"❌ Error comparing collection: {str(e)}")
+
     # Help command
     elif message.content.startswith('!help') or message.content.startswith('!commands'):
         embed = discord.Embed(
@@ -320,7 +392,7 @@ async def on_message(message):
 
         embed.add_field(
             name="📊 Collection Analysis",
-            value="`!setstats <SET>` - Get set statistics\n`!compare <SET>` - Compare your collection to a set\n`!commander` - Get Commander format recommendations",
+            value="`!setstats <SET>` - Get set statistics\n`!compare <SET>` - Compare your collection to a set\n`!compareall` - Compare your top collection sets\n`!commander` - Get Commander format recommendations",
             inline=False
         )
 
@@ -332,7 +404,7 @@ async def on_message(message):
 
         embed.add_field(
             name="🎯 Examples",
-            value="`!setstats MH3`\n`!compare OTJ`\n`!commander`\n`[Lightning Bolt]`\n`[Mana Crypt] price`\n📎 Upload `my_wants.txt`",
+            value="`!setstats MH3`\n`!compare OTJ`\n`!compareall`\n`!commander`\n`[Lightning Bolt]`\n`[Mana Crypt] price`\n📎 Upload `my_wants.txt`",
             inline=False
         )
 
