@@ -49,14 +49,37 @@ def line_cleaner(lines):
     """
     # remove the '\n' from the end of the line
     cards = [card.strip() for card in lines]
+    
+    # Filter out empty lines
+    cards = [card for card in cards if card]
+    
     # remove all what cames after the (
     cards = [card.split(' (')[0] for card in cards]
+    
     # separate the number from the name of the card
-    cards = [card.split(' ', 1) for card in cards]
+    cards_split = []
+    for i, card in enumerate(cards):
+        try:
+            parts = card.split(' ', 1)
+            if len(parts) >= 2:
+                cards_split.append(parts)
+            else:
+                print(f"Warning: Line {i+1} has no space separator: '{card}' - skipping")
+        except Exception as e:
+            print(f"Warning: Error processing line {i+1} '{card}': {e} - skipping")
+    
     # create a list of dictionaries with the cards
-    cards = [{'Number': card[0], 'Name': card[1]} for card in cards]
-    # print(cards)
-    return cards
+    final_cards = []
+    for i, card in enumerate(cards_split):
+        try:
+            if len(card) >= 2:
+                final_cards.append({'Number': card[0], 'Name': card[1]})
+            else:
+                print(f"Warning: Cannot create card entry for line {i+1}: {card} - skipping")
+        except Exception as e:
+            print(f"Warning: Error creating card dictionary for line {i+1}: {e} - skipping")
+    
+    return final_cards
 
 
 def get_cards_from_txt(file_path):
@@ -453,3 +476,70 @@ if __name__ == "__main__":
     # # request_owners(cards, colection, specific_owner='XorVitor')
 
     get_set_stats('FIN')
+
+
+def update_collection_with_owner_data(uploaded_csv_path, owner_name, collection_path):
+    """
+    Updates the main collection CSV by adding owner information to uploaded cards
+    and removing any previous entries from the same owner.
+    
+    Args:
+        uploaded_csv_path (str): Path to the uploaded CSV file
+        owner_name (str): Discord username of the card owner
+        collection_path (str): Path to the main collection CSV file
+    
+    Returns:
+        tuple: (success: bool, message: str, cards_added: int)
+    """
+    try:
+        # Read the uploaded CSV file
+        uploaded_cards = []
+        with open(uploaded_csv_path, mode='r', newline='', encoding='utf-8') as file:
+            csv_reader = csv.DictReader(file)
+            for row in csv_reader:
+                # Add owner column to each row
+                row['Owner'] = owner_name
+                uploaded_cards.append(row)
+        
+        if not uploaded_cards:
+            return False, "The uploaded CSV file is empty or invalid.", 0
+        
+        # Read the existing collection
+        existing_collection = []
+        try:
+            with open(collection_path, mode='r', newline='', encoding='utf-8') as file:
+                csv_reader = csv.DictReader(file)
+                existing_collection = [row for row in csv_reader]
+        except FileNotFoundError:
+            # If collection doesn't exist, we'll create it
+            existing_collection = []
+        
+        # Remove all entries from this owner
+        filtered_collection = [row for row in existing_collection if row.get('Owner', '') != owner_name]
+        
+        # Add the new entries from the uploaded file
+        updated_collection = filtered_collection + uploaded_cards
+        
+        # Get fieldnames from the uploaded file (should include all columns)
+        if uploaded_cards:
+            fieldnames = list(uploaded_cards[0].keys())
+        else:
+            # Fallback fieldnames if no cards uploaded
+            fieldnames = ['Binder Name', 'Binder Type', 'Name', 'Set code', 'Set name', 
+                         'Collector number', 'Foil', 'Rarity', 'Quantity', 'ManaBox ID', 
+                         'Scryfall ID', 'Purchase price', 'Misprint', 'Altered', 
+                         'Condition', 'Language', 'Purchase price currency', 'Owner']
+        
+        # Write the updated collection back to the file
+        with open(collection_path, mode='w', newline='', encoding='utf-8') as file:
+            writer = csv.DictWriter(file, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(updated_collection)
+        
+        cards_added = len(uploaded_cards)
+        old_cards_removed = len(existing_collection) - len(filtered_collection)
+        
+        return True, f"Successfully updated collection! Added {cards_added} cards from {owner_name}. Removed {old_cards_removed} previous entries.", cards_added
+        
+    except Exception as e:
+        return False, f"Error updating collection: {str(e)}", 0
