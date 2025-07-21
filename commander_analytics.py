@@ -46,18 +46,18 @@ class CommanderAnalytics:
                 games_by_id = defaultdict(list)
                 
                 for row in reader:
-                    game_date = datetime.strptime(row['game_date'], '%Y-%m-%d %H:%M:%S')
+                    game_date = datetime.strptime(f"{row['date']} {row['time']}", '%Y-%m-%d %H:%M')
                     if game_date < cutoff_date:
                         continue
                     
                     # Collect data for analysis
-                    games_by_id[row['game_id']].append(row)
-                    stats['total_players'].add(int(row['player_id']))
+                    games_by_id[f"{row['date']}_{row['time']}_{row['total_players']}"].append(row)
+                    stats['total_players'].add(int(row['user_id']))
                     stats['most_active_players'][row['username']] += 1
                     
                     commander = row['commander']
                     placement = int(row['placement'])
-                    colors = row['commander_colors'].split(',') if row['commander_colors'] != '?' else []
+                    colors = row['colors'].split(',') if row['colors'] != '?' else []
                     
                     stats['commander_popularity'][commander] += 1
                     stats['win_rates_by_commander'][commander].append(placement)
@@ -127,16 +127,16 @@ class CommanderAnalytics:
             with open(self.stats_file, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    if int(row['player_id']) != user_id:
+                    if int(row['user_id']) != user_id:
                         continue
                     
-                    game_date = datetime.strptime(row['game_date'], '%Y-%m-%d %H:%M:%S')
+                    game_date = datetime.strptime(f"{row['date']} {row['time']}", '%Y-%m-%d %H:%M')
                     if game_date < cutoff_date:
                         continue
                     
                     placement = int(row['placement'])
                     commander = row['commander']
-                    colors = row['commander_colors'].split(',') if row['commander_colors'] != '?' else []
+                    colors = row['colors'].split(',') if row['colors'] != '?' else []
                     
                     recent_games.append({
                         'date': game_date,
@@ -210,7 +210,7 @@ class CommanderAnalytics:
                 games_by_id = defaultdict(list)
                 
                 for row in reader:
-                    games_by_id[row['game_id']].append(row)
+                    games_by_id[f"{row['date']}_{row['time']}_{row['total_players']}"].append(row)
                 
                 # Find games with both commanders
                 for game_id, players in games_by_id.items():

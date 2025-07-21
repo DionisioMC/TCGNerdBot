@@ -897,12 +897,12 @@ class AchievementManager:
             with open(self.stats_file, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    if int(row['player_id']) == user_id:
+                    if int(row['user_id']) == user_id:
                         stats['total_games'] += 1
                         if int(row['placement']) == 1:
                             stats['total_wins'] += 1
                             # Track archetype wins with normalization
-                            archetype = row.get('commander_archetype', 'Unknown')
+                            archetype = row.get('archetype', 'Unknown')
                             if archetype and archetype != 'Unknown':
                                 normalized_archetype = self._normalize_archetype(archetype)
                                 stats['archetype_wins'][normalized_archetype] += 1
@@ -910,19 +910,22 @@ class AchievementManager:
                         stats['commanders_played'].add(row['commander'])
                         
                         # Track archetypes played with normalization
-                        archetype = row.get('commander_archetype', 'Unknown')
+                        archetype = row.get('archetype', 'Unknown')
                         if archetype and archetype != 'Unknown':
                             normalized_archetype = self._normalize_archetype(archetype)
                             stats['archetypes_played'].add(normalized_archetype)
                         
                         stats['recent_games'].append(row)
                     
-                    # Find players played with
-                    if int(row['player_id']) != user_id:
-                        # Check if this player was in same game
-                        user_games = [g['game_id'] for g in stats['recent_games']]
-                        if row['game_id'] in user_games:
-                            stats['players_played_with'].add(int(row['player_id']))
+                    # Find players played with - group by date and time to identify same games
+                    if int(row['user_id']) != user_id:
+                        # Check if this player was in same game (same date, time, and player count)
+                        for user_game in stats['recent_games']:
+                            if (user_game['date'] == row['date'] and 
+                                user_game['time'] == row['time'] and
+                                user_game['total_players'] == row['total_players']):
+                                stats['players_played_with'].add(int(row['user_id']))
+                                break
         
         except Exception as e:
             print(f"Error getting player stats: {e}")
@@ -940,9 +943,9 @@ class AchievementManager:
             with open(self.stats_file, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    if int(row['player_id']) == user_id:
+                    if int(row['user_id']) == user_id:
                         games.append({
-                            'date': datetime.strptime(row['game_date'], '%Y-%m-%d %H:%M:%S'),
+                            'date': datetime.strptime(f"{row['date']} {row['time']}", '%Y-%m-%d %H:%M'),
                             'placement': int(row['placement'])
                         })
             
@@ -972,9 +975,9 @@ class AchievementManager:
             with open(self.stats_file, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    if int(row['player_id']) == user_id:
+                    if int(row['user_id']) == user_id:
                         games.append({
-                            'date': datetime.strptime(row['game_date'], '%Y-%m-%d %H:%M:%S'),
+                            'date': datetime.strptime(f"{row['date']} {row['time']}", '%Y-%m-%d %H:%M'),
                             'placement': int(row['placement'])
                         })
             
@@ -1013,9 +1016,9 @@ class AchievementManager:
             with open(self.stats_file, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    if (int(row['player_id']) == user_id and 
+                    if (int(row['user_id']) == user_id and 
                         int(row['placement']) == 1 and 
-                        row['commander_colors'] == target_color):
+                        row['colors'] == target_color):
                         return True
             
             return False
@@ -1040,9 +1043,9 @@ class AchievementManager:
             with open(self.stats_file, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    if (int(row['player_id']) == user_id and 
+                    if (int(row['user_id']) == user_id and 
                         int(row['placement']) == 1):
-                        colors = row['commander_colors'].split(',')
+                        colors = row['colors'].split(',')
                         if len(colors) == 5 and set(colors) == {'W', 'U', 'B', 'R', 'G'}:
                             return True
             
@@ -1060,9 +1063,9 @@ class AchievementManager:
             with open(self.stats_file, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    if (int(row['player_id']) == user_id and 
+                    if (int(row['user_id']) == user_id and 
                         int(row['placement']) == 1 and 
-                        row['commander_colors'] in ['C', '']):
+                        row['colors'] in ['C', '']):
                         return True
             
             return False
@@ -1081,8 +1084,8 @@ class AchievementManager:
             with open(self.stats_file, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    if int(row['player_id']) == user_id:
-                        game_date = datetime.strptime(row['game_date'], '%Y-%m-%d %H:%M:%S').date()
+                    if int(row['user_id']) == user_id:
+                        game_date = datetime.strptime(f"{row['date']} {row['time']}", '%Y-%m-%d %H:%M').date()
                         games_by_date[game_date] += 1
             
             return max(games_by_date.values(), default=0) >= required_games
@@ -1099,8 +1102,8 @@ class AchievementManager:
             with open(self.stats_file, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    if int(row['player_id']) == user_id:
-                        game_time = datetime.strptime(row['game_date'], '%Y-%m-%d %H:%M:%S')
+                    if int(row['user_id']) == user_id:
+                        game_time = datetime.strptime(f"{row['date']} {row['time']}", '%Y-%m-%d %H:%M')
                         hour = game_time.hour
                         if start_hour <= hour < end_hour:
                             return True
@@ -1120,9 +1123,9 @@ class AchievementManager:
             with open(self.stats_file, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    if int(row['player_id']) == user_id:
+                    if int(row['user_id']) == user_id:
                         games.append({
-                            'date': datetime.strptime(row['game_date'], '%Y-%m-%d %H:%M:%S'),
+                            'date': datetime.strptime(f"{row['date']} {row['time']}", '%Y-%m-%d %H:%M'),
                             'placement': int(row['placement'])
                         })
             
@@ -1153,9 +1156,9 @@ class AchievementManager:
             with open(self.stats_file, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    if (int(row['player_id']) == user_id and 
+                    if (int(row['user_id']) == user_id and 
                         int(row['placement']) == 1):
-                        colors = row['commander_colors'].split(',')
+                        colors = row['colors'].split(',')
                         if set(colors) == set(target_colors):
                             return True
             
@@ -1186,7 +1189,7 @@ class AchievementManager:
             with open(self.stats_file, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    if (int(row['player_id']) == user_id and 
+                    if (int(row['user_id']) == user_id and 
                         int(row['placement']) == placement):
                         count += 1
                         if count >= required_count:
@@ -1206,17 +1209,18 @@ class AchievementManager:
             count = 0
             with open(self.stats_file, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
-                games_by_id = defaultdict(list)
+                games_by_key = defaultdict(list)
                 
-                # Group by game to find last place
+                # Group by game using date, time, and player count as composite key
                 for row in reader:
-                    games_by_id[row['game_id']].append(row)
+                    game_key = f"{row['date']}_{row['time']}_{row['total_players']}"
+                    games_by_key[game_key].append(row)
                 
-                for game_id, players in games_by_id.items():
+                for game_key, players in games_by_key.items():
                     max_placement = max(int(p['placement']) for p in players)
                     
                     for player in players:
-                        if (int(player['player_id']) == user_id and 
+                        if (int(player['user_id']) == user_id and 
                             int(player['placement']) == max_placement):
                             count += 1
                             if count >= required_count:
@@ -1237,7 +1241,7 @@ class AchievementManager:
             with open(self.stats_file, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    if (int(row['player_id']) == user_id and 
+                    if (int(row['user_id']) == user_id and 
                         int(row['placement']) <= 3):
                         count += 1
                         if count >= required_count:
@@ -1258,7 +1262,7 @@ class AchievementManager:
             with open(self.stats_file, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    if int(row['player_id']) == user_id:
+                    if int(row['user_id']) == user_id:
                         commander_counts[row['commander']] += 1
             
             return max(commander_counts.values(), default=0) >= required_games
@@ -1276,7 +1280,7 @@ class AchievementManager:
             with open(self.stats_file, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    if (int(row['player_id']) == user_id and 
+                    if (int(row['user_id']) == user_id and 
                         int(row['placement']) == 1):
                         commander_wins[row['commander']] += 1
             
@@ -1295,8 +1299,8 @@ class AchievementManager:
             with open(self.stats_file, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    if int(row['player_id']) == user_id:
-                        game_date = datetime.strptime(row['game_date'], '%Y-%m-%d %H:%M:%S')
+                    if int(row['user_id']) == user_id:
+                        game_date = datetime.strptime(f"{row['date']} {row['time']}", '%Y-%m-%d %H:%M')
                         if game_date.weekday() in [5, 6]:  # Saturday=5, Sunday=6
                             weekend_days.add(game_date.weekday())
             
@@ -1316,9 +1320,9 @@ class AchievementManager:
             with open(self.stats_file, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    if (int(row['player_id']) == user_id and 
+                    if (int(row['user_id']) == user_id and 
                         int(row['placement']) == 1):
-                        game_date = datetime.strptime(row['game_date'], '%Y-%m-%d %H:%M:%S').date()
+                        game_date = datetime.strptime(f"{row['date']} {row['time']}", '%Y-%m-%d %H:%M').date()
                         wins_by_date[game_date] += 1
             
             return max(wins_by_date.values(), default=0) >= required_wins
@@ -1336,7 +1340,7 @@ class AchievementManager:
             with open(self.stats_file, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    if int(row['player_id']) == user_id:
+                    if int(row['user_id']) == user_id:
                         placements_achieved.add(int(row['placement']))
             
             return {1, 2, 3, 4}.issubset(placements_achieved)
@@ -1353,7 +1357,7 @@ class AchievementManager:
             with open(self.stats_file, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    if (int(row['player_id']) == user_id and 
+                    if (int(row['user_id']) == user_id and 
                         int(row['placement']) == 1 and 
                         int(row['total_players']) >= min_players):
                         return True
@@ -1373,9 +1377,9 @@ class AchievementManager:
             with open(self.stats_file, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    if int(row['player_id']) == user_id:
+                    if int(row['user_id']) == user_id:
                         games.append({
-                            'date': datetime.strptime(row['game_date'], '%Y-%m-%d %H:%M:%S'),
+                            'date': datetime.strptime(f"{row['date']} {row['time']}", '%Y-%m-%d %H:%M'),
                             'placement': int(row['placement']),
                             'total_players': int(row['total_players'])
                         })
@@ -1406,9 +1410,9 @@ class AchievementManager:
             with open(self.stats_file, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    if int(row['player_id']) == user_id:
+                    if int(row['user_id']) == user_id:
                         games.append({
-                            'date': datetime.strptime(row['game_date'], '%Y-%m-%d %H:%M:%S'),
+                            'date': datetime.strptime(f"{row['date']} {row['time']}", '%Y-%m-%d %H:%M'),
                             'placement': int(row['placement']),
                             'total_players': int(row['total_players'])
                         })
@@ -1441,9 +1445,9 @@ class AchievementManager:
             with open(self.stats_file, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    if int(row['player_id']) == user_id:
+                    if int(row['user_id']) == user_id:
                         games.append({
-                            'date': datetime.strptime(row['game_date'], '%Y-%m-%d %H:%M:%S'),
+                            'date': datetime.strptime(f"{row['date']} {row['time']}", '%Y-%m-%d %H:%M'),
                             'placement': int(row['placement'])
                         })
             
@@ -1479,7 +1483,7 @@ class AchievementManager:
             with open(self.stats_file, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    player_game_counts[int(row['player_id'])] += 1
+                    player_game_counts[int(row['user_id'])] += 1
             
             # Then check games where this player participated
             with open(self.stats_file, 'r', encoding='utf-8') as f:
@@ -1488,7 +1492,7 @@ class AchievementManager:
                 # Group games by game_id
                 games_data = defaultdict(list)
                 for row in reader:
-                    games_data[row['game_id']].append(row)
+                    games_data[f"{row['date']}_{row['time']}_{row['total_players']}"].append(row)
                 
                 # Check each game where this player participated
                 for game_id, players in games_data.items():
@@ -1496,7 +1500,7 @@ class AchievementManager:
                     new_player_in_game = False
                     
                     for player_data in players:
-                        player_id = int(player_data['player_id'])
+                        player_id = int(player_data['user_id'])
                         
                         if player_id == user_id:
                             user_in_game = True
@@ -1526,7 +1530,7 @@ class AchievementManager:
                 # Group games by game_id
                 games_data = defaultdict(list)
                 for row in reader:
-                    games_data[row['game_id']].append(row)
+                    games_data[f"{row['date']}_{row['time']}_{row['total_players']}"].append(row)
                 
                 # For each game, find co-players
                 for game_id, players in games_data.items():
@@ -1534,7 +1538,7 @@ class AchievementManager:
                     other_players = []
                     
                     for player_data in players:
-                        player_id = int(player_data['player_id'])
+                        player_id = int(player_data['user_id'])
                         
                         if player_id == user_id:
                             user_in_game = True
@@ -1562,7 +1566,7 @@ class AchievementManager:
             with open(self.stats_file, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    if int(row['player_id']) == user_id:
+                    if int(row['user_id']) == user_id:
                         game_sizes.add(int(row['total_players']))
             
             # Check for 3, 4, 5, and 6+ player games
@@ -1584,8 +1588,8 @@ class AchievementManager:
             with open(self.stats_file, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    if int(row['player_id']) == user_id:
-                        game_date = datetime.strptime(row['game_date'], '%Y-%m-%d %H:%M:%S').date()
+                    if int(row['user_id']) == user_id:
+                        game_date = datetime.strptime(f"{row['date']} {row['time']}", '%Y-%m-%d %H:%M').date()
                         game_dates.add(game_date)
             
             # Check for any 7-day consecutive period
@@ -1621,9 +1625,9 @@ class AchievementManager:
             with open(self.stats_file, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    if (int(row['player_id']) == user_id and 
+                    if (int(row['user_id']) == user_id and 
                         int(row['placement']) == 1):
-                        game_date = datetime.strptime(row['game_date'], '%Y-%m-%d %H:%M:%S')
+                        game_date = datetime.strptime(f"{row['date']} {row['time']}", '%Y-%m-%d %H:%M')
                         month_key = (game_date.year, game_date.month)
                         wins_by_month[month_key] += 1
             
@@ -1694,7 +1698,7 @@ class AchievementManager:
             with open(self.stats_file, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    if (int(row['player_id']) == user_id and 
+                    if (int(row['user_id']) == user_id and 
                         int(row['placement']) == 1):
                         commander = row['commander']
                         stats = commander_stats[commander]
@@ -1726,8 +1730,8 @@ class AchievementManager:
                     if int(row['placement']) == 1:
                         wins.append({
                             'commander': row['commander'],
-                            'player_id': int(row['player_id']),
-                            'date': datetime.strptime(row['game_date'], '%Y-%m-%d %H:%M:%S')
+                            'user_id': int(row['user_id']),
+                            'date': datetime.strptime(f"{row['date']} {row['time']}", '%Y-%m-%d %H:%M')
                         })
                 
                 # Sort by date to find first wins
@@ -1736,7 +1740,7 @@ class AchievementManager:
                 for win in wins:
                     commander = win['commander']
                     if commander not in first_wins:
-                        first_wins[commander] = win['player_id']
+                        first_wins[commander] = win['user_id']
             
             # Check if this player was first to win with any commander
             for commander, first_player in first_wins.items():
@@ -1761,7 +1765,7 @@ class AchievementManager:
                 reader = csv.DictReader(f)
                 for row in reader:
                     if int(row['placement']) == 1:
-                        player_wins[int(row['player_id'])] += 1
+                        player_wins[int(row['user_id'])] += 1
             
             # Then check games where this player won
             with open(self.stats_file, 'r', encoding='utf-8') as f:
@@ -1770,7 +1774,7 @@ class AchievementManager:
                 # Group games by game_id
                 games_data = defaultdict(list)
                 for row in reader:
-                    games_data[row['game_id']].append(row)
+                    games_data[f"{row['date']}_{row['time']}_{row['total_players']}"].append(row)
                 
                 # Check each game where this player won
                 for game_id, players in games_data.items():
@@ -1778,7 +1782,7 @@ class AchievementManager:
                     opponents_with_50_wins = False
                     
                     for player_data in players:
-                        player_id = int(player_data['player_id'])
+                        player_id = int(player_data['user_id'])
                         placement = int(player_data['placement'])
                         
                         if player_id == user_id and placement == 1:
@@ -1804,8 +1808,8 @@ class AchievementManager:
             with open(self.stats_file, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    if int(row['player_id']) == user_id:
-                        colors = row['commander_colors']
+                    if int(row['user_id']) == user_id:
+                        colors = row['colors']
                         if colors:  # Make sure not empty
                             # Normalize color combination (sort and join)
                             color_list = sorted(colors.split(','))
@@ -1839,7 +1843,7 @@ class AchievementManager:
             with open(self.stats_file, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    if (int(row['player_id']) == user_id and 
+                    if (int(row['user_id']) == user_id and 
                         int(row['placement']) == 1):
                         commander_name = row['commander'].lower()
                         
@@ -1874,7 +1878,7 @@ class AchievementManager:
             with open(self.stats_file, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    if (int(row['player_id']) == user_id and 
+                    if (int(row['user_id']) == user_id and 
                         int(row['placement']) == 1):
                         commander_name = row['commander'].lower()
                         
@@ -1916,6 +1920,44 @@ class AchievementManager:
         leaderboard.sort(key=lambda x: x[1]['total_points'], reverse=True)
         return leaderboard[:limit]
     
+    def find_achievement(self, search_term: str) -> Optional[Achievement]:
+        """Find an achievement by ID or name (case-insensitive)."""
+        search_lower = search_term.lower()
+        
+        # First try exact ID match
+        if search_term in self.achievements:
+            return self.achievements[search_term]
+        
+        # Try case-insensitive ID match
+        for achievement_id, achievement in self.achievements.items():
+            if achievement_id.lower() == search_lower:
+                return achievement
+        
+        # Try name match (case-insensitive)
+        for achievement in self.achievements.values():
+            if achievement.name.lower() == search_lower:
+                return achievement
+        
+        # Try partial name match
+        for achievement in self.achievements.values():
+            if search_lower in achievement.name.lower():
+                return achievement
+        
+        return None
+    
+    def get_all_achievements_by_category(self) -> Dict[str, List[Achievement]]:
+        """Get all achievements grouped by category."""
+        categories = defaultdict(list)
+        for achievement in self.achievements.values():
+            categories[achievement.category].append(achievement)
+        
+        # Sort achievements within each category by rarity then points
+        rarity_order = {'common': 1, 'uncommon': 2, 'rare': 3, 'epic': 4, 'legendary': 5}
+        for category in categories:
+            categories[category].sort(key=lambda x: (rarity_order.get(x.rarity, 0), x.points))
+        
+        return dict(categories)
+    
     def _normalize_archetype(self, archetype: str) -> str:
         """Normalize archetype names for consistent comparison."""
         if not archetype:
@@ -1942,10 +1984,10 @@ class AchievementManager:
             with open(self.stats_file, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    if (int(row['player_id']) == user_id and 
+                    if (int(row['user_id']) == user_id and 
                         int(row['placement']) == 1):
                         # Normalize the stored archetype for comparison
-                        stored_archetype = self._normalize_archetype(row.get('commander_archetype', ''))
+                        stored_archetype = self._normalize_archetype(row.get('archetype', ''))
                         if stored_archetype == normalized_archetype:
                             wins_count += 1
                             if wins_count >= required_wins:
@@ -1966,9 +2008,9 @@ class AchievementManager:
             with open(self.stats_file, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    if (int(row['player_id']) == user_id and 
+                    if (int(row['user_id']) == user_id and 
                         int(row['placement']) == 1):
-                        archetype = row.get('commander_archetype')
+                        archetype = row.get('archetype')
                         if archetype and archetype != 'Unknown':
                             # Normalize archetype names for consistent counting
                             normalized_archetype = self._normalize_archetype(archetype)
@@ -1989,9 +2031,9 @@ class AchievementManager:
             with open(self.stats_file, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    if (int(row['player_id']) == user_id and 
+                    if (int(row['user_id']) == user_id and 
                         int(row['placement']) == 1):
-                        archetype = row.get('commander_archetype')
+                        archetype = row.get('archetype')
                         if archetype and archetype != 'Unknown':
                             # Normalize archetype names for consistent counting
                             normalized_archetype = self._normalize_archetype(archetype)
@@ -2012,8 +2054,8 @@ class AchievementManager:
             with open(self.stats_file, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    if int(row['player_id']) == user_id:
-                        archetype = row.get('commander_archetype')
+                    if int(row['user_id']) == user_id:
+                        archetype = row.get('archetype')
                         if archetype and archetype != 'Unknown':
                             archetype_games[archetype] += 1
             
@@ -2021,6 +2063,90 @@ class AchievementManager:
             
         except Exception:
             return False
+
+
+def create_achievement_detail_embed(achievement: Achievement, user_has_earned: bool = False, 
+                                  earned_date: str = None, earned_by_count: int = 0, 
+                                  total_players: int = 0) -> discord.Embed:
+    """Create detailed embed for a specific achievement."""
+    rarity_colors = {
+        'common': 0x95a5a6,
+        'uncommon': 0x2ecc71,
+        'rare': 0x3498db,
+        'epic': 0x9b59b6,
+        'legendary': 0xf39c12
+    }
+    
+    rarity_emojis = {
+        'common': '⚪',
+        'uncommon': '🟢', 
+        'rare': '🔵',
+        'epic': '🟣',
+        'legendary': '🟠'
+    }
+    
+    status_emoji = "✅" if user_has_earned else "🔒"
+    title = f"{status_emoji} {achievement.emoji} {achievement.name}"
+    
+    embed = discord.Embed(
+        title=title,
+        description=achievement.description,
+        color=rarity_colors.get(achievement.rarity, 0x95a5a6)
+    )
+    
+    # Basic info section
+    embed.add_field(
+        name="📋 Basic Info",
+        value=(
+            f"**ID:** `{achievement.id}`\n"
+            f"**Category:** {achievement.category.title()}\n"
+            f"**Rarity:** {rarity_emojis.get(achievement.rarity, '⚪')} {achievement.rarity.title()}\n"
+            f"**Points:** 🏆 {achievement.points}\n"
+            f"**Hidden:** {'Yes' if achievement.hidden else 'No'}"
+        ),
+        inline=True
+    )
+    
+    # Progress/Status section
+    if user_has_earned and earned_date:
+        try:
+            from datetime import datetime
+            earned_dt = datetime.fromisoformat(earned_date.replace('Z', '+00:00'))
+            date_str = earned_dt.strftime("%B %d, %Y")
+        except:
+            date_str = "Unknown"
+        
+        embed.add_field(
+            name="🎯 Your Progress",
+            value=f"**Status:** Earned ✅\n**Date Earned:** {date_str}",
+            inline=True
+        )
+    else:
+        embed.add_field(
+            name="🎯 Your Progress",
+            value="**Status:** Not Earned 🔒\n**Date Earned:** N/A",
+            inline=True
+        )
+    
+    # Statistics section
+    if total_players > 0:
+        percentage = (earned_by_count / total_players) * 100
+        rarity_desc = "Very Common" if percentage >= 75 else \
+                     "Common" if percentage >= 50 else \
+                     "Uncommon" if percentage >= 25 else \
+                     "Rare" if percentage >= 10 else "Very Rare"
+        
+        embed.add_field(
+            name="📊 Server Statistics",
+            value=(
+                f"**Earned by:** {earned_by_count}/{total_players} players\n"
+                f"**Completion Rate:** {percentage:.1f}%\n"
+                f"**Actual Rarity:** {rarity_desc}"
+            ),
+            inline=False
+        )
+    
+    return embed
 
 
 def create_achievement_embed(achievement: Achievement, is_new: bool = False) -> discord.Embed:

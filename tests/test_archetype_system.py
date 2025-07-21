@@ -121,7 +121,7 @@ def test_commander_manager():
             print("  ❌ set_commander_archetype_by_user method missing")
         
         # Test CSV field names include archetype
-        fieldnames = ['game_id', 'player_id', 'username', 'commander',
+        fieldnames = ['game_id', 'user_id', 'username', 'commander',
                       'commander_colors', 'commander_archetype', 'placement', 'game_date', 'total_players']
         
         if 'commander_archetype' in fieldnames:

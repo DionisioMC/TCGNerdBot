@@ -486,6 +486,7 @@ def _create_help_page_3() -> discord.Embed:
         value=(
             "`!commander achievements` - View your achievements 🆕\n"
             "`!commander achievements check` - Check for new achievements 🆕\n"
+            "`!commander achievements info <name>` - View achievement details 🆕\n"
             "`!commander leaderboard` - Achievement leaderboard 🆕"
         ),
         inline=False

@@ -32,7 +32,8 @@ from commander_analytics import (
     analytics, create_meta_analysis_embed, create_player_trends_embed
 )
 from achievements import (
-    achievement_manager, create_achievement_embed, create_achievements_overview_embed
+    achievement_manager, create_achievement_embed, create_achievements_overview_embed,
+    create_achievement_detail_embed
 )
 
 
@@ -704,6 +705,43 @@ class CommandHandlers:
                             await message.channel.send(embed=embed)
                     else:
                         await message.channel.send("✅ No new achievements at this time. Keep playing to unlock more!")
+                elif len(args) > 1 and args[1].lower() in ["info", "detail", "details"]:
+                    # Show details of a specific achievement
+                    if len(args) < 3:
+                        await message.channel.send("❌ Please specify an achievement to view! Usage: `!c achievements info <achievement_name_or_id>`\n\nExample: `!c achievements info first_win`")
+                        return
+                    
+                    search_term = " ".join(args[2:])  # Join remaining args in case name has spaces
+                    achievement = achievement_manager.find_achievement(search_term)
+                    
+                    if not achievement:
+                        await message.channel.send(f"❌ Achievement '{search_term}' not found. Try a different name or ID.\n\n💡 Tip: Use `!c achievements` to see all available achievements.")
+                        return
+                    
+                    # Check if user has earned this achievement
+                    player_data = achievement_manager.get_player_achievements(user_id)
+                    user_has_earned = achievement.id in player_data['earned']
+                    earned_date = None
+                    
+                    if user_has_earned:
+                        earned_info = player_data['earned'][achievement.id]
+                        earned_date = earned_info.get('earned_at') or earned_info.get('date')
+                    
+                    # Calculate server statistics
+                    total_players = len(achievement_manager.player_achievements)
+                    earned_by_count = 0
+                    for player_data_item in achievement_manager.player_achievements.values():
+                        if achievement.id in player_data_item['earned']:
+                            earned_by_count += 1
+                    
+                    embed = create_achievement_detail_embed(
+                        achievement, 
+                        user_has_earned=user_has_earned,
+                        earned_date=earned_date,
+                        earned_by_count=earned_by_count,
+                        total_players=total_players
+                    )
+                    await message.channel.send(embed=embed)
                 else:
                     # Show achievements overview
                     player_data = achievement_manager.get_player_achievements(user_id)

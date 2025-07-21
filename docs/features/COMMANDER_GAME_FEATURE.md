@@ -87,7 +87,7 @@ Stores currently active games with all player information, commanders, and place
 ### Statistics (CSV)
 Stores completed game results with columns:
 - game_id
-- player_id (Discord user ID)
+- user_id (Discord user ID)
 - username
 - commander
 - commander_colors (comma-separated color identity)

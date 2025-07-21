@@ -616,7 +616,7 @@ class CommanderGameManager:
             file_exists = os.path.exists(self.stats_file)
 
             with open(self.stats_file, 'a', newline='', encoding='utf-8') as f:
-                fieldnames = ['game_id', 'player_id', 'username', 'commander',
+                fieldnames = ['game_id', 'user_id', 'username', 'commander',
                               'commander_colors', 'commander_archetype', 'placement', 'game_date', 'total_players']
                 writer = csv.DictWriter(f, fieldnames=fieldnames)
 
@@ -633,7 +633,7 @@ class CommanderGameManager:
 
                     writer.writerow({
                         'game_id': game.game_id,
-                        'player_id': user_id,
+                        'user_id': user_id,
                         'username': player_data['username'],
                         'commander': player_data['commander'],
                         'commander_colors': colors_str,
@@ -699,7 +699,7 @@ class CommanderGameManager:
             with open(self.stats_file, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    if int(row['player_id']) == user_id:
+                    if int(row['user_id']) == user_id:
                         stats['total_games'] += 1
                         placement = int(row['placement'])
                         placements.append(placement)
@@ -717,7 +717,7 @@ class CommanderGameManager:
                             commander, 0) + 1
 
                         # Process color information
-                        colors_str = row.get('commander_colors', '?')
+                        colors_str = row.get('colors', '?')
                         if colors_str and colors_str != '?':
                             colors = colors_str.split(',')
 

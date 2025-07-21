@@ -187,7 +187,7 @@ def test_integration():
     # Create test stats file
     with open(test_stats_file, 'w', newline='', encoding='utf-8') as f:
         writer = csv.DictWriter(f, fieldnames=[
-            'game_id', 'player_id', 'username', 'commander', 'commander_colors', 
+            'game_id', 'user_id', 'username', 'commander', 'commander_colors', 
             'placement', 'game_date', 'total_players'
         ])
         writer.writeheader()
@@ -196,7 +196,7 @@ def test_integration():
         test_data = [
             {
                 'game_id': 'game_test_1',
-                'player_id': test_user_id,
+                'user_id': test_user_id,
                 'username': 'TestPlayer',
                 'commander': 'Atraxa, Praetors\' Voice',
                 'commander_colors': 'W,U,B,G',
@@ -206,7 +206,7 @@ def test_integration():
             },
             {
                 'game_id': 'game_test_2', 
-                'player_id': test_user_id,
+                'user_id': test_user_id,
                 'username': 'TestPlayer',
                 'commander': 'Edgar Markov',
                 'commander_colors': 'W,B,R',
