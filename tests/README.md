@@ -8,6 +8,11 @@ This directory contains all test files for the TCG Nerd Bot project.
 - `test_integration.py` - Integration tests for main features
 - `test_quick.py` - Quick functionality validation
 - `simple_test.py` - Basic functionality tests
+- `test_coverage_analysis.py` - Test coverage analysis and gap identification
+
+### API Integration Tests
+- `test_scryfall_api.py` - Scryfall API card lookup and data extraction
+- `test_daily_card.py` - Daily card posting and scheduling functionality
 
 ### Commander Game Tests
 - `test_setcommander_no_id.py` - Commander setting without game ID
@@ -42,6 +47,10 @@ This directory contains all test files for the TCG Nerd Bot project.
 
 ### Collection Management Tests
 - `test_compareall.py` - Collection comparison tests
+- `test_request_db.py` - Collection database operations and analysis
+
+### Discord & UI Tests  
+- `test_discord_helpers.py` - Discord embed creation and message utilities
 
 ## Running Tests
 

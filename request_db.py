@@ -9,17 +9,29 @@ def check_card_in_db(db_data, card, owner=None):
     Args:
         db_data (list of dict): A list of dictionaries representing the database, 
                                 where each dictionary contains card information.
-        card (dict): A dictionary containing the card details to search for. 
-                     Must include a 'Name' key.
+        card (dict or str): A dictionary containing the card details to search for 
+                           (must include a 'Name' key), or a string with the card name.
         owner (str, optional): The owner to filter the search by. Defaults to None.
 
     Returns:
         list: A list of owners for the matching cards. If `owner` is specified, 
               only the matching owner's name is returned in the list.
     """
+    # Handle null or empty database
+    if not db_data:
+        return []
+    
+    # Handle both string and dict inputs for card
+    if isinstance(card, str):
+        card_name = card
+    elif isinstance(card, dict) and 'Name' in card:
+        card_name = card['Name']
+    else:
+        return []  # Invalid input
+    
     list_owner = []
     for card_db in db_data:
-        if card['Name'].lower() in card_db['Name'].lower():
+        if card_name.lower() in card_db['Name'].lower():
             if owner:
                 if card_db['Owner'] == owner:
                     list_owner.append(card_db['Owner'])
@@ -123,12 +135,13 @@ def request_owners(cards, colection, specific_owner=None):
     Searches for card owners in a database and organizes the results.
 
     Args:
-        cards (list): A list of dictionaries representing cards. Each dictionary should contain a 'Name' key.
+        cards (list): A list of dictionaries representing cards (each should contain a 'Name' key)
+                     or a list of strings representing card names.
         colection (object): The database or collection to search for card ownership.
         specific_owner (str, optional): A specific owner to filter the search. Defaults to None.
 
     Returns:
-        None: The function prints the results directly, including:
+        str: The function returns a formatted string with the results, including:
             - Cards found in the database and their respective owners.
             - A summary of owners and the cards they own.
             - A list of unique cards found in the database.
@@ -137,16 +150,24 @@ def request_owners(cards, colection, specific_owner=None):
     dict_card_by_owners = {}
     result = ""
     for card in cards:
+        # Handle both string and dict inputs
+        if isinstance(card, str):
+            card_name = card
+        elif isinstance(card, dict) and 'Name' in card:
+            card_name = card['Name']
+        else:
+            continue  # Skip invalid entries
+            
         list_owners = check_card_in_db(colection, card, specific_owner)
         if not list_owners == []:
             unique_owners = list(set(list_owners))
             for owner in unique_owners:
                 if owner not in dict_card_by_owners:
                     dict_card_by_owners[owner] = []
-                dict_card_by_owners[owner].append(card['Name'])
+                dict_card_by_owners[owner].append(card_name)
             print(
-                f"{card['Name']} found in the database. Owners: {', '.join(unique_owners)}")
-            list_foundeds.append(card['Name'])
+                f"{card_name} found in the database. Owners: {', '.join(unique_owners)}")
+            list_foundeds.append(card_name)
     for owner in dict_card_by_owners:
         result += f"Owner: {owner}, Cards: {', '.join(dict_card_by_owners[owner])}\n"
     return result
@@ -154,21 +175,30 @@ def request_owners(cards, colection, specific_owner=None):
 
 def get_known_owners(colection):
     """
-    Prints the unique owners of cards in the given collection.
+    Prints the unique owners of cards in the given collection and returns them.
 
     Args:
         colection (list of dict): A list of dictionaries where each dictionary 
                                   represents a card and contains an 'Owner' key.
 
     Returns:
-        None
+        list: A list of unique owner names.
     """
+    if not colection:
+        print('Known owners:')
+        return []
+        
     print('Known owners:')
     owners = set()
     for card in colection:
-        owners.add(card['Owner'])
-    for owner in owners:
+        if 'Owner' in card:
+            owners.add(card['Owner'])
+    
+    owner_list = list(owners)
+    for owner in owner_list:
         print(owner)
+    
+    return owner_list
 
 
 def get_cards_of_set(colection, set_name):

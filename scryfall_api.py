@@ -71,6 +71,8 @@ def get_card_price_eur(card_data: Dict[str, Any]) -> Optional[str]:
     Returns:
         EUR price as string or None if not available.
     """
+    if not card_data:
+        return None
     prices = card_data.get('prices', {})
     return prices.get('eur')
 
@@ -85,5 +87,20 @@ def get_card_image_url(card_data: Dict[str, Any]) -> Optional[str]:
     Returns:
         Image URL or None if not available.
     """
+    if not card_data:
+        return None
+    
+    # Check for regular single-faced card
     image_uris = card_data.get('image_uris', {})
-    return image_uris.get('normal')
+    if image_uris:
+        return image_uris.get('normal')
+    
+    # Check for double-faced card (first face)
+    card_faces = card_data.get('card_faces', [])
+    if card_faces and len(card_faces) > 0:
+        first_face = card_faces[0]
+        if isinstance(first_face, dict):
+            face_image_uris = first_face.get('image_uris', {})
+            return face_image_uris.get('normal')
+    
+    return None
