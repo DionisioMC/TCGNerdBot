@@ -52,6 +52,27 @@ async def on_ready():
 
 
 @client.event
+async def on_reaction_add(reaction: discord.Reaction, user: discord.User):
+    """Event handler for processing reaction additions."""
+    # Ignore reactions from the bot itself
+    if user == client.user:
+        return
+    
+    # Ensure command handlers are initialized
+    if not command_handlers:
+        return
+    
+    try:
+        # Handle placement reactions
+        await command_handlers.handle_placement_reaction(reaction, user)
+        
+        # Handle join game reactions  
+        await command_handlers.handle_join_game_reaction(reaction, user)
+    except Exception as e:
+        print(f"Error processing reaction: {e}")
+
+
+@client.event
 async def on_message(message: discord.Message):
     """Event handler for processing messages."""
     # Ignore messages from the bot itself
@@ -108,6 +129,14 @@ async def on_message(message: discord.Message):
         # Help command
         elif message.content.startswith('!help') or message.content.startswith('!commands'):
             await command_handlers.handle_help_command(message)
+
+        # Commander game tracking commands
+        elif message.content.startswith('!commander'):
+            try:
+                args = message.content.split()[1:]  # Remove '!commander' from args
+                await command_handlers.handle_commander_command(message, args)
+            except IndexError:
+                await command_handlers.handle_commander_command(message, [])
 
         # Original collection request when bot is mentioned
         elif client.user and client.user.mentioned_in(message):

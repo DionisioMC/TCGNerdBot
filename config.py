@@ -59,5 +59,7 @@ EMBED_COLORS = {
     'comparison': 0xff9900,
     'help': 0x00ffff,
     'card_ownership': 0x9932cc,
-    'success': 0x00ff00
+    'success': 0x00ff00,
+    'commander_game': 0x8B4513,
+    'commander_stats': 0x8B4513
 }

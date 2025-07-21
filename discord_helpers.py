@@ -278,8 +278,33 @@ def create_help_embed() -> discord.Embed:
     )
 
     embed.add_field(
+        name="🎯 Commander Game Tracking",
+        value=(
+            "**Game Management:**\n"
+            "`!commander create` - Start a new commander game\n"
+            "`!commander join <game_id>` - Join an existing game\n"
+            "`!commander leave <game_id>` - Leave a game\n"
+            "`!commander list` - List active games in this channel\n"
+            "`!commander info <game_id>` - Show game details\n\n"
+            "**Game Setup:**\n"
+            "`!commander setcommander <game_id> <commander_name>` - Set your commander\n"
+            "`!commander setplace` - Set your placement with emoji reactions\n"
+            "`!commander finish <game_id>` - Finish game (creator only)\n\n"
+            "**Statistics:**\n"
+            "`!commander stats` - View your game statistics & color preferences\n"
+            "`!commander help` - Detailed commander commands help"
+        ),
+        inline=False
+    )
+
+    embed.add_field(
         name="🎯 Examples",
-        value="`!setstats MH3`\n`!compare OTJ`\n`!compareall`\n`!dailycard`\n`[Lightning Bolt]`\n`[Mana Crypt] price`\n📎 Upload `my_wants.txt`\n`!upload` + 📋 `my_collection.csv`",
+        value=(
+            "**Collection:** `!setstats MH3` • `!compare OTJ` • `!compareall`\n"
+            "**Cards:** `[Lightning Bolt]` • `[Mana Crypt] price` • `!dailycard`\n"
+            "**Commander Games:** `!commander create` • `!commander join game_123` • `!commander stats`\n"
+            "**Files:** 📎 Upload `my_wants.txt` • `!upload` + 📋 `my_collection.csv`"
+        ),
         inline=False
     )
     
