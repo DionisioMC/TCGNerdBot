@@ -68,6 +68,12 @@ async def on_reaction_add(reaction: discord.Reaction, user: discord.User):
         
         # Handle join game reactions  
         await command_handlers.handle_join_game_reaction(reaction, user)
+        
+        # Handle help navigation reactions
+        await command_handlers.handle_help_navigation_reaction(reaction, user)
+        
+        # Handle archetype selection reactions
+        await command_handlers.handle_archetype_reaction(reaction, user)
     except Exception as e:
         print(f"Error processing reaction: {e}")
 
@@ -110,13 +116,16 @@ async def on_message(message: discord.Message):
         elif message.content.startswith('!compareall'):
             await command_handlers.handle_compareall_command(message)
 
-        # Collection comparison command: !compare <SET_CODE>
-        elif message.content.startswith('!compare'):
+        # Collection comparison command: !compare <SET_CODE> (with alias !comp)
+        elif message.content.startswith('!compare') or message.content.startswith('!comp'):
             try:
-                set_code = message.content.split()[1].upper()
+                if message.content.startswith('!comp'):
+                    set_code = message.content.split()[1].upper()
+                else:
+                    set_code = message.content.split()[1].upper()
                 await command_handlers.handle_compare_command(message, set_code)
             except IndexError:
-                await message.channel.send("❌ Please provide a set code! Usage: `!compare <SET_CODE>`\nExample: `!compare OTJ`")
+                await message.channel.send("❌ Please provide a set code! Usage: `!compare <SET_CODE>` or `!comp <SET_CODE>`\nExample: `!comp OTJ`")
 
         # Test daily card command (manual trigger)
         elif message.content.startswith('!dailycard') or message.content.startswith('!randomcard'):
@@ -126,17 +135,30 @@ async def on_message(message: discord.Message):
         elif message.content.startswith('!upload'):
             await command_handlers.handle_upload_command(message)
 
-        # Help command
-        elif message.content.startswith('!help') or message.content.startswith('!commands'):
+        # Help command (with aliases)
+        elif (message.content.startswith('!help') or 
+              message.content.startswith('!commands') or 
+              message.content.startswith('!h')):
             await command_handlers.handle_help_command(message)
 
-        # Commander game tracking commands
-        elif message.content.startswith('!commander'):
+        # Commander game tracking commands (with aliases)
+        elif (message.content.startswith('!commander') or 
+              message.content.startswith('!c ')):
             try:
-                args = message.content.split()[1:]  # Remove '!commander' from args
+                # Handle alias
+                if message.content.startswith('!c '):
+                    # Replace !c with !commander for processing
+                    command_content = message.content.replace('!c ', '!commander ', 1)
+                    args = command_content.split()[1:]  # Remove '!commander' from args
+                else:
+                    args = message.content.split()[1:]  # Remove '!commander' from args
                 await command_handlers.handle_commander_command(message, args)
             except IndexError:
                 await command_handlers.handle_commander_command(message, [])
+
+        # Short alias for commander (just "!c")
+        elif message.content == '!c':
+            await command_handlers.handle_commander_command(message, [])
 
         # Original collection request when bot is mentioned
         elif client.user and client.user.mentioned_in(message):

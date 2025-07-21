@@ -61,5 +61,7 @@ EMBED_COLORS = {
     'card_ownership': 0x9932cc,
     'success': 0x00ff00,
     'commander_game': 0x8B4513,
-    'commander_stats': 0x8B4513
+    'commander_stats': 0x8B4513,
+    'achievements': 0xf39c12,
+    'analytics': 0x3498db
 }

@@ -13,7 +13,7 @@ from scryfall_api import ScryfallAPI, get_card_price_eur, get_card_image_url
 from discord_helpers import (
     create_set_stats_embed,
     create_collection_overview_embed, create_collection_comparison_embed,
-    create_help_embed, split_message_into_chunks
+    create_help_embed, create_help_embed_page, split_message_into_chunks
 )
 from request_db import (
     get_cards_from_csv, get_cards_from_txt, request_owners,
@@ -28,6 +28,12 @@ from commander_games import (
     get_placement_emojis, get_placement_from_emoji, create_join_games_embed,
     get_join_game_emojis
 )
+from commander_analytics import (
+    analytics, create_meta_analysis_embed, create_player_trends_embed
+)
+from achievements import (
+    achievement_manager, create_achievement_embed, create_achievements_overview_embed
+)
 
 
 class CommandHandlers:
@@ -37,6 +43,7 @@ class CommandHandlers:
         self.client = client
         self.guild_id = guild_id
         self.collection_path = COLLECTION_PATH
+        self.archetype_messages = {}  # Track archetype selection messages
     
     async def handle_card_lookup(self, message: discord.Message, card_name: str) -> None:
         """Handle card lookup with [card name] syntax."""
@@ -271,12 +278,40 @@ class CommandHandlers:
         await self.handle_csv_collection_upload(message, csv_attachment)
 
     async def handle_help_command(self, message: discord.Message) -> None:
-        """Handle !help command."""
+        """Handle !help command with pagination."""
         try:
-            embed = create_help_embed()
-            await message.channel.send(embed=embed)
+            embed = create_help_embed_page(1)  # Start with page 1
+            help_message = await message.channel.send(embed=embed)
+            
+            # Add navigation reactions
+            await help_message.add_reaction("⬅️")
+            await help_message.add_reaction("➡️")
+            
+            # Store the message for reaction handling
+            if not hasattr(self, 'pending_help_navigations'):
+                self.pending_help_navigations = {}
+            
+            self.pending_help_navigations[help_message.id] = {
+                'current_page': 1,
+                'total_pages': 4,
+                'user_id': message.author.id,
+                'channel_id': message.channel.id
+            }
+            
+            # Clean up after 5 minutes
+            import asyncio
+            asyncio.create_task(self._cleanup_help_navigation(help_message.id, 300))  # 5 minutes
+            
         except Exception as e:
             await message.channel.send(f"❌ Error displaying help: {str(e)}")
+    
+    async def _cleanup_help_navigation(self, message_id: int, delay: int) -> None:
+        """Clean up help navigation data after a delay."""
+        import asyncio
+        await asyncio.sleep(delay)
+        
+        if hasattr(self, 'pending_help_navigations') and message_id in self.pending_help_navigations:
+            del self.pending_help_navigations[message_id]
 
     async def handle_mention(self, message: discord.Message) -> None:
         """Handle when bot is mentioned."""
@@ -295,7 +330,22 @@ class CommandHandlers:
             await self.send_commander_help(message)
             return
 
+        # Handle subcommand aliases
+        subcommand_aliases = {
+            'c': 'create',
+            'j': 'join',
+            'l': 'leave',
+            's': 'start',
+            'r': 'remove',
+            'e': 'end',
+            'st': 'stats',
+            'g': 'games'
+        }
+        
         subcommand = args[0].lower()
+        if subcommand in subcommand_aliases:
+            subcommand = subcommand_aliases[subcommand]
+            
         username = str(message.author.display_name)
         user_id = message.author.id
         channel_id = message.channel.id
@@ -370,13 +420,70 @@ class CommandHandlers:
                     # Old format: !commander setcommander <game_id> <commander_name>
                     game_id = args[1]
                     commander_name = " ".join(args[2:])
-                    success, msg = await commander_manager.set_commander(game_id, user_id, commander_name)
+                    success, msg, archetype_data = await commander_manager.set_commander(game_id, user_id, commander_name)
+                    
+                    if success and archetype_data and archetype_data.get('archetypes'):
+                        # Show archetype selection
+                        game = commander_manager.get_game_info(game_id)
+                        current_archetype = game.players[user_id].get('commander_archetype', 'Unknown')
+                        
+                        await message.channel.send(f"✅ {msg}")
+                        
+                        # Create archetype selection embed
+                        from commander_games import create_archetype_selection_embed, get_archetype_emojis
+                        embed = create_archetype_selection_embed(commander_name, archetype_data, current_archetype)
+                        
+                        archetype_msg = await message.channel.send(embed=embed)
+                        
+                        # Add reactions for archetype selection
+                        emojis = get_archetype_emojis(archetype_data['archetypes'])
+                        for emoji in emojis:
+                            await archetype_msg.add_reaction(emoji)
+                        
+                        # Store archetype selection data for reaction handling
+                        self.archetype_messages[archetype_msg.id] = {
+                            'user_id': user_id,
+                            'game_id': game_id,
+                            'commander_name': commander_name,
+                            'archetypes': archetype_data['archetypes'],
+                            'emojis': emojis
+                        }
+                        return
+                    else:
+                        await message.channel.send(f"{'✅' if success else '❌'} {msg}")
                 else:
                     # New format: !commander setcommander <commander_name>
                     commander_name = " ".join(args[1:])
-                    success, msg, game = await commander_manager.set_commander_by_user(user_id, commander_name)
-                
-                await message.channel.send(f"{'✅' if success else '❌'} {msg}")
+                    success, msg, game, archetype_data = await commander_manager.set_commander_by_user(user_id, commander_name)
+                    
+                    if success and archetype_data and archetype_data.get('archetypes'):
+                        # Show archetype selection
+                        current_archetype = game.players[user_id].get('commander_archetype', 'Unknown')
+                        
+                        await message.channel.send(f"✅ {msg}")
+                        
+                        # Create archetype selection embed
+                        from commander_games import create_archetype_selection_embed, get_archetype_emojis
+                        embed = create_archetype_selection_embed(commander_name, archetype_data, current_archetype)
+                        
+                        archetype_msg = await message.channel.send(embed=embed)
+                        
+                        # Add reactions for archetype selection
+                        emojis = get_archetype_emojis(archetype_data['archetypes'])
+                        for emoji in emojis:
+                            await archetype_msg.add_reaction(emoji)
+                        
+                        # Store archetype selection data for reaction handling
+                        self.archetype_messages[archetype_msg.id] = {
+                            'user_id': user_id,
+                            'game_id': game.game_id,
+                            'commander_name': commander_name,
+                            'archetypes': archetype_data['archetypes'],
+                            'emojis': emojis
+                        }
+                        return
+                    else:
+                        await message.channel.send(f"{'✅' if success else '❌'} {msg}")
                 
                 if success:
                     # Try to get game for info display
@@ -476,6 +583,49 @@ class CommandHandlers:
                 else:
                     await message.channel.send("❌ Game not found!")
 
+            elif subcommand == "archetype":
+                # Change commander archetype with reaction selection
+                game = commander_manager.get_user_unfinished_game(user_id)
+                
+                if not game:
+                    await message.channel.send("❌ You're not in any active commander games!")
+                    return
+                
+                if not game.players[user_id].get('commander'):
+                    await message.channel.send("❌ You need to set your commander first using `!commander setcommander <commander_name>`!")
+                    return
+                
+                commander_name = game.players[user_id]['commander']
+                current_archetype = game.players[user_id].get('commander_archetype', 'Unknown')
+                
+                # Fetch archetype data from EDHREC
+                from edhrec_api import edhrec_api
+                archetype_data = edhrec_api.get_commander_archetypes(commander_name)
+                
+                if not archetype_data or not archetype_data.get('archetypes'):
+                    await message.channel.send(f"❌ No archetype data available for **{commander_name}**!")
+                    return
+                
+                # Create archetype selection embed
+                from commander_games import create_archetype_selection_embed, get_archetype_emojis
+                embed = create_archetype_selection_embed(commander_name, archetype_data, current_archetype)
+                
+                archetype_msg = await message.channel.send(embed=embed)
+                
+                # Add reactions for archetype selection
+                emojis = get_archetype_emojis(archetype_data['archetypes'])
+                for emoji in emojis:
+                    await archetype_msg.add_reaction(emoji)
+                
+                # Store archetype selection data for reaction handling
+                self.archetype_messages[archetype_msg.id] = {
+                    'user_id': user_id,
+                    'game_id': game.game_id,
+                    'commander_name': commander_name,
+                    'archetypes': archetype_data['archetypes'],
+                    'emojis': emojis
+                }
+
             elif subcommand == "list":
                 # List active games in this channel
                 active_games = commander_manager.get_channel_active_games(channel_id)
@@ -506,6 +656,103 @@ class CommandHandlers:
                 # Show player stats
                 stats = commander_manager.get_player_stats(user_id)
                 embed = create_player_stats_embed(user_id, username, stats)
+                await message.channel.send(embed=embed)
+
+            elif subcommand == "meta":
+                # Show server meta analysis
+                days = 30
+                if len(args) > 1:
+                    try:
+                        days = int(args[1])
+                        days = max(1, min(days, 365))  # Limit between 1 and 365 days
+                    except ValueError:
+                        pass
+                
+                await message.channel.send(f"📊 Analyzing server meta for the last {days} days...")
+                
+                meta_stats = analytics.get_server_meta_analysis(channel_id, days)
+                embed = create_meta_analysis_embed(meta_stats, days)
+                await message.channel.send(embed=embed)
+
+            elif subcommand == "trends":
+                # Show player trends analysis
+                days = 30
+                if len(args) > 1:
+                    try:
+                        days = int(args[1])
+                        days = max(1, min(days, 365))
+                    except ValueError:
+                        pass
+                
+                await message.channel.send(f"📈 Analyzing your trends for the last {days} days...")
+                
+                trends = analytics.get_player_trends(user_id, days)
+                embed = create_player_trends_embed(user_id, username, trends)
+                await message.channel.send(embed=embed)
+
+            elif subcommand == "achievements":
+                # Show or manage achievements
+                if len(args) > 1 and args[1].lower() == "check":
+                    # Check for new achievements
+                    new_achievements = achievement_manager.check_achievements(user_id)
+                    
+                    if new_achievements:
+                        await message.channel.send(f"🎉 **{username}**, you've earned {len(new_achievements)} new achievement{'s' if len(new_achievements) > 1 else ''}!")
+                        
+                        for achievement in new_achievements:
+                            embed = create_achievement_embed(achievement, is_new=True)
+                            await message.channel.send(embed=embed)
+                    else:
+                        await message.channel.send("✅ No new achievements at this time. Keep playing to unlock more!")
+                else:
+                    # Show achievements overview
+                    player_data = achievement_manager.get_player_achievements(user_id)
+                    total_achievements = len(achievement_manager.achievements)
+                    
+                    embed = create_achievements_overview_embed(user_id, username, player_data, total_achievements)
+                    await message.channel.send(embed=embed)
+
+            elif subcommand == "leaderboard":
+                # Show achievement leaderboard
+                leaderboard = achievement_manager.get_achievement_leaderboard(10)
+                
+                if not leaderboard:
+                    await message.channel.send("📊 No achievement data available yet.")
+                    return
+                
+                embed = discord.Embed(
+                    title="🏆 Achievement Leaderboard",
+                    color=EMBED_COLORS.get('achievements', 0xf39c12),
+                    description="Top players by achievement points"
+                )
+                
+                leaderboard_text = ""
+                rank_emojis = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
+                
+                for i, (player_id, data) in enumerate(leaderboard):
+                    emoji = rank_emojis[i] if i < len(rank_emojis) else f"{i+1}."
+                    
+                    # Try to get username from recent games
+                    player_name = f"Player {player_id}"
+                    try:
+                        # This is a simplified way - in production you'd want to cache usernames
+                        player_name = f"<@{player_id}>"
+                    except:
+                        pass
+                    
+                    leaderboard_text += (
+                        f"{emoji} **{player_name}**\n"
+                        f"   🏆 {data['total_points']} points • "
+                        f"🎯 {data['total_achievements']} achievements\n\n"
+                    )
+                
+                embed.add_field(
+                    name="🏅 Rankings",
+                    value=leaderboard_text,
+                    inline=False
+                )
+                
+                embed.set_footer(text="🎮 Play more games to climb the leaderboard!")
                 await message.channel.send(embed=embed)
 
             else:
@@ -657,12 +904,82 @@ class CommandHandlers:
         if message_id in commander_manager.pending_join_selections:
             del commander_manager.pending_join_selections[message_id]
 
+    async def handle_help_navigation_reaction(self, reaction: discord.Reaction, user: discord.User) -> None:
+        """Handle help page navigation reactions."""
+        # Check if this is a pending help navigation
+        if not hasattr(self, 'pending_help_navigations'):
+            return
+        
+        message_id = reaction.message.id
+        if message_id not in self.pending_help_navigations:
+            return
+        
+        help_data = self.pending_help_navigations[message_id]
+        
+        # Make sure it's the right user
+        if user.id != help_data['user_id']:
+            # Remove reaction from wrong user
+            try:
+                await reaction.remove(user)
+            except:
+                pass
+            return
+        
+        # Handle navigation
+        emoji_str = str(reaction.emoji)
+        current_page = help_data['current_page']
+        total_pages = help_data['total_pages']
+        new_page = current_page
+        
+        if emoji_str == "⬅️" and current_page > 1:
+            new_page = current_page - 1
+        elif emoji_str == "➡️" and current_page < total_pages:
+            new_page = current_page + 1
+        else:
+            # Invalid navigation, remove reaction
+            try:
+                await reaction.remove(user)
+            except:
+                pass
+            return
+        
+        # Update the page if changed
+        if new_page != current_page:
+            help_data['current_page'] = new_page
+            new_embed = create_help_embed_page(new_page)
+            
+            try:
+                await reaction.message.edit(embed=new_embed)
+            except Exception as e:
+                print(f"Error updating help page: {e}")
+        
+        # Remove the user's reaction to allow re-clicking
+        try:
+            await reaction.remove(user)
+        except:
+            pass
+
     async def send_commander_help(self, message: discord.Message) -> None:
         """Send commander commands help."""
         embed = discord.Embed(
             title="🎯 Commander Game Commands",
             color=EMBED_COLORS.get('help', 0x00ffff),
             description="Track your Magic: The Gathering Commander games with **simplified commands**!"
+        )
+        
+        embed.add_field(
+            name="⚡ Quick Aliases",
+            value=(
+                "`!c` = `!commander` (main command)\n"
+                "`!c c` = `!commander create`\n"
+                "`!c j` = `!commander join`\n"
+                "`!c l` = `!commander leave`\n"
+                "`!c s` = `!commander start`\n"
+                "`!c e` = `!commander end`\n"
+                "`!c st` = `!commander stats`\n"
+                "`!comp` = `!compare` • `!h` = `!help`"
+            ),
+            inline=False
         )
         
         embed.add_field(
@@ -681,6 +998,7 @@ class CommandHandlers:
             name="⚙️ Game Setup",
             value=(
                 "`!commander setcommander <commander_name>` - Set your commander (auto-finds your game) 🆕\n"
+                "`!commander archetype` - Change your commander's archetype 🆕\n"
                 "`!commander setplace` - Set your final placement with emoji reactions 🆕\n"
                 "`!commander finish <game_id>` - Finish the game (creator only)"
             ),
@@ -688,10 +1006,22 @@ class CommandHandlers:
         )
         
         embed.add_field(
-            name="📊 Statistics & Help",
+            name="📊 Statistics & Analytics",
             value=(
                 "`!commander stats` - View your commander game statistics\n"
+                "`!commander meta [days]` - Server meta analysis (default: 30 days) 🆕\n"
+                "`!commander trends [days]` - Your performance trends (default: 30 days) 🆕\n"
                 "`!commander help` - Show this help message"
+            ),
+            inline=False
+        )
+        
+        embed.add_field(
+            name="🏆 Achievements",
+            value=(
+                "`!commander achievements` - View your achievements 🆕\n"
+                "`!commander achievements check` - Check for new achievements 🆕\n"
+                "`!commander leaderboard` - Achievement leaderboard 🆕"
             ),
             inline=False
         )
@@ -702,7 +1032,9 @@ class CommandHandlers:
                 "🎯 **No more game IDs needed** - Commands automatically find your active game\n"
                 "🎮 **Interactive game selection** - React with emojis to join games\n"
                 "🎨 **Color tracking** - Automatically fetches commander colors from Scryfall\n"
-                "📊 **Rich statistics** - Track colors, win rates, and favorite commanders"
+                "📊 **Rich statistics** - Track colors, win rates, and favorite commanders\n"
+                "📈 **Advanced analytics** - Server meta analysis and performance trends\n"
+                "🏆 **Achievement system** - Unlock achievements and compete on leaderboards"
             ),
             inline=False
         )
@@ -719,9 +1051,93 @@ class CommandHandlers:
             inline=False
         )
         
-        embed.set_footer(text="🚀 Enhanced UX • 2-8 players supported • All results saved for statistics")
+        embed.set_footer(text="🚀 Enhanced UX • 📊 Analytics • 🏆 Achievements • 2-8 players supported")
         
         await message.channel.send(embed=embed)
+
+    async def handle_archetype_reaction(self, reaction: discord.Reaction, user: discord.User) -> None:
+        """Handle archetype selection reactions."""
+        # Check if this is an archetype selection message
+        if not hasattr(self, 'archetype_messages'):
+            return
+        
+        message_id = reaction.message.id
+        if message_id not in self.archetype_messages:
+            return
+        
+        archetype_data = self.archetype_messages[message_id]
+        
+        # Check if the reaction is from the correct user
+        if user.id != archetype_data['user_id']:
+            # Remove reaction from wrong user
+            try:
+                await reaction.remove(user)
+            except:
+                pass
+            return
+        
+        # Find which archetype this emoji represents
+        emoji_str = str(reaction.emoji)
+        emojis = archetype_data['emojis']
+        archetypes = archetype_data['archetypes']
+        
+        # Find the index of the emoji in the list
+        selected_archetype = None
+        try:
+            emoji_index = emojis.index(emoji_str)
+            if emoji_index < len(archetypes):
+                selected_archetype = archetypes[emoji_index]
+        except (ValueError, IndexError):
+            # Invalid emoji, remove reaction
+            try:
+                await reaction.remove(user)
+            except:
+                pass
+            return
+        
+        if not selected_archetype:
+            try:
+                await reaction.remove(user)
+            except:
+                pass
+            return
+        
+        # Update the archetype using commander_manager
+        from commander_games import commander_manager
+        success, msg = commander_manager.set_archetype(
+            archetype_data['game_id'],
+            user.id,
+            selected_archetype
+        )
+        
+        if success:
+            # Update the original message to show the archetype was set
+            embed = discord.Embed(
+                title="✅ Archetype Set!",
+                color=0x00ff00,
+                description=f"**{user.display_name}** - Archetype for **{archetype_data['commander_name']}** set to **{selected_archetype}**!"
+            )
+            
+            try:
+                await reaction.message.edit(embed=embed)
+                await reaction.message.clear_reactions()
+            except:
+                pass
+        else:
+            # Error setting archetype
+            error_embed = discord.Embed(
+                title="❌ Error",
+                color=0xff0000,
+                description=msg
+            )
+            try:
+                await reaction.message.edit(embed=error_embed)
+            except:
+                pass
+        
+        # Clean up the message data
+        if message_id in self.archetype_messages:
+            del self.archetype_messages[message_id]
 
 
 def parse_bracketed_content(content: str) -> str:

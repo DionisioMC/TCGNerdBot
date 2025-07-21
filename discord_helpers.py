@@ -236,75 +236,272 @@ def create_collection_comparison_embed(set_code: str, comparison: Dict[str, Any]
 
 def create_help_embed() -> discord.Embed:
     """
-    Create a Discord embed for the help command.
+    Create a Discord embed for the help command - Page 1 (Basic Commands).
     
     Returns:
         Discord embed object.
     """
+    return create_help_embed_page(1)
+
+
+def create_help_embed_page(page: int) -> discord.Embed:
+    """
+    Create a paginated Discord embed for the help command.
+    
+    Args:
+        page: Page number (1-4)
+        
+    Returns:
+        Discord embed object.
+    """
+    if page == 1:
+        return _create_help_page_1()
+    elif page == 2:
+        return _create_help_page_2()
+    elif page == 3:
+        return _create_help_page_3()
+    elif page == 4:
+        return _create_help_page_4()
+    else:
+        return _create_help_page_1()  # Default to page 1
+
+
+def _create_help_page_1() -> discord.Embed:
+    """Create help page 1: Basic Commands & Quick Start."""
     embed = discord.Embed(
-        title="🤖 TCG Nerd Bot Commands",
+        title="🤖 TCG Nerd Bot Commands - Page 1/4",
         color=EMBED_COLORS['help'],
-        description="Your Magic: The Gathering collection assistant!"
+        description="Your Magic: The Gathering collection assistant! 🎯\n\n⚡ **Quick Aliases:** `!h` = help • `!c` = commander • `!comp` = compare"
     )
 
     embed.add_field(
-        name="🔍 Card Lookup",
-        value="`[card name]` - Show card image\n`[card name] price` - Show EUR price",
-        inline=False
-    )
-
-    embed.add_field(
-        name="📚 Wiki Lookup",
-        value="`{keyword}` - Search MTG Wiki",
+        name="🔍 Card & Wiki Lookup",
+        value=(
+            "`[card name]` - Show card image\n"
+            "`[card name] price` - Show EUR price\n"
+            "`{keyword}` - Search MTG Wiki"
+        ),
         inline=False
     )
 
     embed.add_field(
         name="📊 Collection Analysis",
-        value="`!setstats <SET>` - Get set statistics\n`!compare <SET>` - Compare your collection to a set\n`!compareall` - Compare your top collection sets",
+        value=(
+            "`!setstats <SET>` - Get set statistics\n"
+            "`!compare <SET>` or `!comp <SET>` - Compare collection to set\n"
+            "`!compareall` - Compare your top collection sets"
+        ),
         inline=False
     )
 
     embed.add_field(
         name="🌟 Daily Features",
-        value="`!dailycard` or `!randomcard` - Get a random MTG card\n🕙 **Auto daily cards at 10:00 AM**",
+        value=(
+            "`!dailycard` or `!randomcard` - Get a random MTG card\n"
+            "🕙 **Auto daily cards at 10:00 AM**"
+        ),
         inline=False
     )
 
     embed.add_field(
         name="📁 File Upload",
-        value="**Upload a .txt file** - Check who owns cards from your want list\n**Format:** `1x Card Name` per line\n**Example:**\n```\n1x Lightning Bolt\n2x Counterspell\n1x Sol Ring\n```\n\n**`!upload` + CSV file** - Update your collection\n**Format:** Standard CSV collection export with card data\n**Owner:** Your Discord name will be automatically added",
+        value=(
+            "**Upload .txt file** - Check who owns cards from your want list\n"
+            "**Format:** `1x Card Name` per line\n"
+            "**Upload CSV + `!upload`** - Update your collection"
+        ),
         inline=False
     )
 
     embed.add_field(
-        name="🎯 Commander Game Tracking",
+        name="📖 Navigation",
+        value="🔹 Page 2: Commander Games • 🔹 Page 3: Archetype System • 🔹 Page 4: Examples\n\n**Use ⬅️ ➡️ reactions to navigate pages**",
+        inline=False
+    )
+    
+    return embed
+
+
+def _create_help_page_2() -> discord.Embed:
+    """Create help page 2: Commander Game Management."""
+    embed = discord.Embed(
+        title="🎯 Commander Game Commands - Page 2/4",
+        color=EMBED_COLORS['help'],
+        description="Track your Magic: The Gathering Commander games with **simplified commands**!"
+    )
+    
+    embed.add_field(
+        name="⚡ Quick Aliases",
         value=(
-            "**Game Management:**\n"
-            "`!commander create` - Start a new commander game\n"
-            "`!commander join <game_id>` - Join an existing game\n"
-            "`!commander leave <game_id>` - Leave a game\n"
+            "`!c` = `!commander` (main command)\n"
+            "`!c c` = `!commander create`\n"
+            "`!c j` = `!commander join`\n"
+            "`!c l` = `!commander leave`\n"
+            "`!c s` = `!commander start`\n"
+            "`!c e` = `!commander end`\n"
+            "`!c st` = `!commander stats`"
+        ),
+        inline=False
+    )
+    
+    embed.add_field(
+        name="🎮 Game Management",
+        value=(
+            "`!commander create` - Create a new game\n"
+            "`!commander join` - Join a game (interactive selection) 🆕\n"
+            "`!commander leave` - Leave your current game (auto-finds) 🆕\n"
             "`!commander list` - List active games in this channel\n"
-            "`!commander info <game_id>` - Show game details\n\n"
-            "**Game Setup:**\n"
-            "`!commander setcommander <game_id> <commander_name>` - Set your commander\n"
-            "`!commander setplace` - Set your placement with emoji reactions\n"
-            "`!commander finish <game_id>` - Finish game (creator only)\n\n"
-            "**Statistics:**\n"
-            "`!commander stats` - View your game statistics & color preferences\n"
-            "`!commander help` - Detailed commander commands help"
+            "`!commander info <game_id>` - Show game details"
+        ),
+        inline=False
+    )
+    
+    embed.add_field(
+        name="⚙️ Game Setup",
+        value=(
+            "`!commander setcommander <name>` - Set commander with archetype 🆕\n"
+            "`!commander archetype` - Change your commander's archetype 🆕\n"
+            "`!commander setplace` - Set placement with emoji reactions 🆕\n"
+            "`!commander finish <game_id>` - Finish the game (creator only)"
+        ),
+        inline=False
+    )
+    
+    embed.add_field(
+        name="📊 Statistics & Analytics",
+        value=(
+            "`!commander stats` - View your game statistics & archetype data 🆕\n"
+            "`!commander meta [days]` - Server meta analysis 🆕\n"
+            "`!commander trends [days]` - Your performance trends 🆕"
         ),
         inline=False
     )
 
     embed.add_field(
-        name="🎯 Examples",
+        name="📖 Navigation",
+        value="🔹 Page 1: Basic Commands • 🔹 Page 3: Archetype System • 🔹 Page 4: Examples\n\n**Use ⬅️ ➡️ reactions to navigate pages**",
+        inline=False
+    )
+    
+    return embed
+
+
+def _create_help_page_3() -> discord.Embed:
+    """Create help page 3: Archetype System & Achievements."""
+    embed = discord.Embed(
+        title="🏆 Archetype System & Achievements - Page 3/4",
+        color=EMBED_COLORS['help'],
+        description="New archetype tracking system with interactive selection and achievements! 🎯"
+    )
+
+    embed.add_field(
+        name="� Archetype System",
         value=(
-            "**Collection:** `!setstats MH3` • `!compare OTJ` • `!compareall`\n"
-            "**Cards:** `[Lightning Bolt]` • `[Mana Crypt] price` • `!dailycard`\n"
-            "**Commander Games:** `!commander create` • `!commander join game_123` • `!commander stats`\n"
-            "**Files:** 📎 Upload `my_wants.txt` • `!upload` + 📋 `my_collection.csv`"
+            "🎯 **Automatic Commander Archetype Detection**\n"
+            "• Set commander → Select archetype with emoji reactions\n"
+            "• ⚡ Aggro, 🛡️ Control, 🔄 Combo, ⚖️ Midrange, 👥 Tokens, 🤖 Voltron, and more!\n"
+            "• Uses EDHREC API for intelligent suggestions\n"
+            "• Fallback system when API is rate-limited"
         ),
+        inline=False
+    )
+
+    embed.add_field(
+        name="🏆 Achievement System",
+        value=(
+            "`!commander achievements` - View your achievements 🆕\n"
+            "`!commander achievements check` - Check for new achievements 🆕\n"
+            "`!commander leaderboard` - Achievement leaderboard 🆕"
+        ),
+        inline=False
+    )
+
+    embed.add_field(
+        name="🎖️ Archetype Achievements",
+        value=(
+            "**12 New Archetype-Based Achievements:**\n"
+            "• Master specific strategies (5+ wins with archetype)\n"
+            "• Explore different playstyles (try multiple archetypes)\n"
+            "• Track progression and earn leaderboard points\n"
+            "• Special achievements for versatility and dominance"
+        ),
+        inline=False
+    )
+
+    embed.add_field(
+        name="📊 Enhanced Statistics",
+        value=(
+            "• Win rates by archetype\n"
+            "• Meta analysis with archetype trends\n"
+            "• Personal performance tracking\n"
+            "• Server-wide archetype popularity"
+        ),
+        inline=False
+    )
+
+    embed.add_field(
+        name="📖 Navigation",
+        value="🔹 Page 1: Basic Commands • 🔹 Page 2: Commander Games • 🔹 Page 4: Examples\n\n**Use ⬅️ ➡️ reactions to navigate pages**",
+        inline=False
+    )
+    
+    return embed
+
+
+def _create_help_page_4() -> discord.Embed:
+    """Create help page 4: Examples & Quick Reference."""
+    embed = discord.Embed(
+        title="🎯 Examples & Quick Reference - Page 4/4",
+        color=EMBED_COLORS['help'],
+        description="Practical examples to get you started quickly! 🚀"
+    )
+
+    embed.add_field(
+        name="🔍 Card & Collection Examples",
+        value=(
+            "**Collection:** `!setstats MH3` • `!comp OTJ` • `!compareall`\n"
+            "**Cards:** `[Lightning Bolt]` • `[Mana Crypt] price` • `!dailycard`\n"
+            "**Wiki:** `{planeswalker}` • `{cascade}` • `{commander damage}`"
+        ),
+        inline=False
+    )
+
+    embed.add_field(
+        name="🎯 Commander Game Examples",
+        value=(
+            "**Quick Commands:**\n"
+            "`!c c` → Create game • `!c j` → Join game • `!c st` → View stats\n\n"
+            "**Full Commands:**\n"
+            "`!commander create` → Start new game\n"
+            "`!commander setcommander Atraxa` → Set commander with archetype selection 🆕\n"
+            "`!commander join` → Interactive game selection with reactions 🆕"
+        ),
+        inline=False
+    )
+
+    embed.add_field(
+        name="🏆 Archetype & Achievement Examples",
+        value=(
+            "**Archetype Selection:** Choose ⚡ Aggro, 🛡️ Control, 🔄 Combo with reactions 🆕\n"
+            "**Achievements:** `!commander achievements` • `!commander leaderboard` 🆕\n"
+            "**Analytics:** `!commander meta 7` → Last 7 days meta analysis 🆕"
+        ),
+        inline=False
+    )
+
+    embed.add_field(
+        name="� File Upload Examples",
+        value=(
+            "**Want List (📎 .txt file):**\n"
+            "```\n1x Lightning Bolt\n2x Counterspell\n1x Sol Ring\n```\n"
+            "**Collection Update:** Upload CSV + `!upload` command"
+        ),
+        inline=False
+    )
+
+    embed.add_field(
+        name="📖 Navigation",
+        value="🔹 Page 1: Basic Commands • 🔹 Page 2: Commander Games • 🔹 Page 3: Archetype System\n\n**Use ⬅️ ➡️ reactions to navigate pages**",
         inline=False
     )
     
