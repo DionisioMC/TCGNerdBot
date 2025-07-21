@@ -11,10 +11,10 @@ from config import RARITY_EMOJIS, COLOR_EMOJIS, EMBED_COLORS, MAX_MESSAGE_LENGTH
 def create_daily_card_embed(card_data: Dict[str, Any]) -> discord.Embed:
     """
     Create a Discord embed for the daily random card.
-    
+
     Args:
         card_data: Card data from Scryfall API.
-        
+
     Returns:
         Discord embed object.
     """
@@ -23,26 +23,26 @@ def create_daily_card_embed(card_data: Dict[str, Any]) -> discord.Embed:
         color=EMBED_COLORS['daily_card'],
         description="Here's today's random Magic card!"
     )
-    
+
     # Card basic info
     embed.add_field(
         name="📜 Card Name",
         value=f"**{card_data.get('name', 'Unknown')}**",
         inline=True
     )
-    
+
     embed.add_field(
         name="💎 Mana Cost",
         value=card_data.get('mana_cost', 'N/A'),
         inline=True
     )
-    
+
     embed.add_field(
         name="🎴 Type",
         value=card_data.get('type_line', 'Unknown'),
         inline=True
     )
-    
+
     # Set info
     set_name = card_data.get('set_name', 'Unknown Set')
     set_code = card_data.get('set', 'N/A').upper()
@@ -51,7 +51,7 @@ def create_daily_card_embed(card_data: Dict[str, Any]) -> discord.Embed:
         value=f"{set_name} ({set_code})",
         inline=True
     )
-    
+
     # Rarity with emoji
     rarity = card_data.get('rarity', 'common').lower()
     rarity_emoji = RARITY_EMOJIS.get(rarity, '❓')
@@ -60,7 +60,7 @@ def create_daily_card_embed(card_data: Dict[str, Any]) -> discord.Embed:
         value=f"{rarity_emoji} {rarity.capitalize()}",
         inline=True
     )
-    
+
     # Oracle text (truncated if too long)
     oracle_text = card_data.get('oracle_text', '')
     if oracle_text:
@@ -71,12 +71,13 @@ def create_daily_card_embed(card_data: Dict[str, Any]) -> discord.Embed:
             value=oracle_text,
             inline=False
         )
-    
+
     # Add card image
     image_uris = card_data.get('image_uris', {})
     if image_uris:
-        embed.set_image(url=image_uris.get('normal', image_uris.get('large', '')))
-    
+        embed.set_image(url=image_uris.get(
+            'normal', image_uris.get('large', '')))
+
     # Add Scryfall link
     scryfall_uri = card_data.get('scryfall_uri', '')
     if scryfall_uri:
@@ -85,19 +86,20 @@ def create_daily_card_embed(card_data: Dict[str, Any]) -> discord.Embed:
             value=f"[View on Scryfall]({scryfall_uri})",
             inline=False
         )
-    
-    embed.set_footer(text="Daily card updates at 10:00 AM • Powered by Scryfall")
-    
+
+    embed.set_footer(
+        text="Daily card updates at 10:00 AM • Powered by Scryfall")
+
     return embed
 
 
 def create_set_stats_embed(stats: Dict[str, Any]) -> discord.Embed:
     """
     Create a Discord embed for set statistics.
-    
+
     Args:
         stats: Set statistics data (supports both full API format and simplified format).
-        
+
     Returns:
         Discord embed object.
     """
@@ -116,21 +118,21 @@ def create_set_stats_embed(stats: Dict[str, Any]) -> discord.Embed:
         set_code = stats.get('set_code', 'UNK')
         release_date = stats.get('release_date', 'Unknown')
         total_cards = stats.get('total_cards', 0)
-        
+
         # Build rarity breakdown from individual counts
         rarity_breakdown = {}
         for rarity in ['mythic', 'rare', 'uncommon', 'common']:
             count_key = f'{rarity}_count'
             if count_key in stats:
                 rarity_breakdown[rarity] = stats[count_key]
-        
+
         color_breakdown = stats.get('color_breakdown', {})
-    
+
     embed = discord.Embed(
         title=f"📊 Set Statistics: {set_name}",
         color=EMBED_COLORS['set_stats']
     )
-    
+
     embed.add_field(
         name="📅 Basic Info",
         value=f"**Code:** {set_code}\n**Release:** {release_date}\n**Total Cards:** {total_cards}",
@@ -142,35 +144,39 @@ def create_set_stats_embed(stats: Dict[str, Any]) -> discord.Embed:
         rarity_text = ""
         for rarity, count in rarity_breakdown.items():
             if count > 0:
-                percentage = (count / total_cards * 100) if total_cards > 0 else 0
+                percentage = (count / total_cards *
+                              100) if total_cards > 0 else 0
                 rarity_text += f"**{rarity.capitalize()}:** {count} ({percentage:.1f}%)\n"
 
         if rarity_text:
-            embed.add_field(name="🎴 Rarity Breakdown", value=rarity_text, inline=True)
+            embed.add_field(name="🎴 Rarity Breakdown",
+                            value=rarity_text, inline=True)
 
     # Color breakdown
     if color_breakdown:
         color_text = ""
         for color, count in color_breakdown.items():
             if count > 0:
-                percentage = (count / total_cards * 100) if total_cards > 0 else 0
+                percentage = (count / total_cards *
+                              100) if total_cards > 0 else 0
                 emoji = COLOR_EMOJIS.get(color, '🎨')
                 color_text += f"{emoji} **{color.capitalize()}:** {count} ({percentage:.1f}%)\n"
 
         if color_text:
-            embed.add_field(name="🎨 Color Distribution", value=color_text, inline=False)
-    
+            embed.add_field(name="🎨 Color Distribution",
+                            value=color_text, inline=False)
+
     return embed
 
 
 def create_collection_overview_embed(username: str, comparisons: List[Dict[str, Any]]) -> discord.Embed:
     """
     Create a Discord embed for collection overview.
-    
+
     Args:
         username: The username of the requester.
         comparisons: List of set comparison results (supports both full and simplified formats).
-        
+
     Returns:
         Discord embed object.
     """
@@ -198,9 +204,10 @@ def create_collection_overview_embed(username: str, comparisons: List[Dict[str, 
             completion_pct = comp.get('completion', 0)
             your_total = comp.get('owned', 0)
             set_total = comp.get('total', 0)
-            set_name = comp.get('set_name', f"Set {comp.get('set_code', 'UNK')}")
+            set_name = comp.get(
+                'set_name', f"Set {comp.get('set_code', 'UNK')}")
             set_code = comp.get('set_code', 'UNK')
-        
+
         # Add completion emoji
         if completion_pct >= 50:
             emoji = "🎯"
@@ -216,14 +223,15 @@ def create_collection_overview_embed(username: str, comparisons: List[Dict[str, 
 
     embed.add_field(
         name="🏆 Top Sets by Completion",
-        value=completion_text[:1000] + ("..." if len(completion_text) > 1000 else ""),
+        value=completion_text[:1000] +
+        ("..." if len(completion_text) > 1000 else ""),
         inline=False
     )
 
     # Calculate overall stats
     total_owned = 0
     total_possible = 0
-    
+
     for comp in comparisons:
         if 'your_total' in comp:
             total_owned += comp['your_total']
@@ -231,13 +239,15 @@ def create_collection_overview_embed(username: str, comparisons: List[Dict[str, 
         else:
             total_owned += comp.get('owned', 0)
             total_possible += comp.get('total', 0)
-    
-    overall_completion = (total_owned / total_possible * 100) if total_possible > 0 else 0
-    
+
+    overall_completion = (total_owned / total_possible *
+                          100) if total_possible > 0 else 0
+
     # Count sets with 50%+ completion
     high_completion_sets = 0
     for comp in comparisons:
-        completion = comp.get('completion_percentage', comp.get('completion', 0))
+        completion = comp.get('completion_percentage',
+                              comp.get('completion', 0))
         if completion >= 50:
             high_completion_sets += 1
 
@@ -252,18 +262,18 @@ def create_collection_overview_embed(username: str, comparisons: List[Dict[str, 
         value="Use `!compare <SET>` for detailed set analysis",
         inline=True
     )
-    
+
     return embed
 
 
 def create_collection_comparison_embed(set_code: str, comparison: Dict[str, Any]) -> discord.Embed:
     """
     Create a Discord embed for collection comparison.
-    
+
     Args:
         set_code: The set code being compared.
         comparison: Comparison result data (supports both full and simplified formats).
-        
+
     Returns:
         Discord embed object.
     """
@@ -280,7 +290,7 @@ def create_collection_comparison_embed(set_code: str, comparison: Dict[str, Any]
         set_total = comparison.get('total_cards', 0)
         completion_pct = comparison.get('completion_percentage', 0)
         rarity_breakdown = comparison.get('rarity_breakdown', {})
-    
+
     embed = discord.Embed(
         title=f"🔍 Collection Comparison: {set_code}",
         color=EMBED_COLORS['comparison'],
@@ -296,23 +306,23 @@ def create_collection_comparison_embed(set_code: str, comparison: Dict[str, Any]
 
         embed.add_field(
             name="🎴 Collection by Rarity",
-            value=rarity_text or "No cards found", 
+            value=rarity_text or "No cards found",
             inline=True
         )
-    
+
     embed.add_field(
-        name="💡 Tip", 
-        value="Use `!compareall` to see your collection overview!", 
+        name="💡 Tip",
+        value="Use `!compareall` to see your collection overview!",
         inline=False
     )
-    
+
     return embed
 
 
 def create_help_embed() -> discord.Embed:
     """
     Create a Discord embed for the help command - Page 1 (Basic Commands).
-    
+
     Returns:
         Discord embed object.
     """
@@ -322,10 +332,10 @@ def create_help_embed() -> discord.Embed:
 def create_help_embed_page(page: int) -> discord.Embed:
     """
     Create a paginated Discord embed for the help command.
-    
+
     Args:
         page: Page number (1-4)
-        
+
     Returns:
         Discord embed object.
     """
@@ -393,7 +403,7 @@ def _create_help_page_1() -> discord.Embed:
         value="🔹 Page 2: Commander Games • 🔹 Page 3: Archetype System • 🔹 Page 4: Examples\n\n**Use ⬅️ ➡️ reactions to navigate pages**",
         inline=False
     )
-    
+
     return embed
 
 
@@ -404,7 +414,7 @@ def _create_help_page_2() -> discord.Embed:
         color=EMBED_COLORS['help'],
         description="Track your Magic: The Gathering Commander games with **simplified commands**!"
     )
-    
+
     embed.add_field(
         name="⚡ Quick Aliases",
         value=(
@@ -418,36 +428,36 @@ def _create_help_page_2() -> discord.Embed:
         ),
         inline=False
     )
-    
+
     embed.add_field(
         name="🎮 Game Management",
         value=(
             "`!commander create` - Create a new game\n"
-            "`!commander join` - Join a game (interactive selection) 🆕\n"
-            "`!commander leave` - Leave your current game (auto-finds) 🆕\n"
+            "`!commander join` - Join a game (interactive selection) \n"
+            "`!commander leave` - Leave your current game (auto-finds) \n"
             "`!commander list` - List active games in this channel\n"
             "`!commander info <game_id>` - Show game details"
         ),
         inline=False
     )
-    
+
     embed.add_field(
         name="⚙️ Game Setup",
         value=(
-            "`!commander setcommander <name>` - Set commander with archetype 🆕\n"
-            "`!commander archetype` - Change your commander's archetype 🆕\n"
-            "`!commander setplace` - Set placement with emoji reactions 🆕\n"
+            "`!commander setcommander <name>` - Set commander with archetype \n"
+            "`!commander archetype` - Change your commander's archetype \n"
+            "`!commander setplace` - Set placement with emoji reactions \n"
             "`!commander finish <game_id>` - Finish the game (creator only)"
         ),
         inline=False
     )
-    
+
     embed.add_field(
         name="📊 Statistics & Analytics",
         value=(
-            "`!commander stats` - View your game statistics & archetype data 🆕\n"
-            "`!commander meta [days]` - Server meta analysis 🆕\n"
-            "`!commander trends [days]` - Your performance trends 🆕"
+            "`!commander stats` - View your game statistics & archetype data \n"
+            "`!commander meta [days]` - Server meta analysis \n"
+            "`!commander trends [days]` - Your performance trends "
         ),
         inline=False
     )
@@ -457,7 +467,7 @@ def _create_help_page_2() -> discord.Embed:
         value="🔹 Page 1: Basic Commands • 🔹 Page 3: Archetype System • 🔹 Page 4: Examples\n\n**Use ⬅️ ➡️ reactions to navigate pages**",
         inline=False
     )
-    
+
     return embed
 
 
@@ -484,10 +494,10 @@ def _create_help_page_3() -> discord.Embed:
     embed.add_field(
         name="🏆 Achievement System",
         value=(
-            "`!commander achievements` - View your achievements 🆕\n"
-            "`!commander achievements check` - Check for new achievements 🆕\n"
-            "`!commander achievements info <name>` - View achievement details 🆕\n"
-            "`!commander leaderboard` - Achievement leaderboard 🆕"
+            "`!commander achievements` - View your achievements \n"
+            "`!commander achievements check` - Check for new achievements \n"
+            "`!commander achievements info <name>` - View achievement details \n"
+            "`!commander leaderboard` - Achievement leaderboard "
         ),
         inline=False
     )
@@ -520,7 +530,7 @@ def _create_help_page_3() -> discord.Embed:
         value="🔹 Page 1: Basic Commands • 🔹 Page 2: Commander Games • 🔹 Page 4: Examples\n\n**Use ⬅️ ➡️ reactions to navigate pages**",
         inline=False
     )
-    
+
     return embed
 
 
@@ -549,8 +559,8 @@ def _create_help_page_4() -> discord.Embed:
             "`!c c` → Create game • `!c j` → Join game • `!c st` → View stats\n\n"
             "**Full Commands:**\n"
             "`!commander create` → Start new game\n"
-            "`!commander setcommander Atraxa` → Set commander with archetype selection 🆕\n"
-            "`!commander join` → Interactive game selection with reactions 🆕"
+            "`!commander setcommander Atraxa` → Set commander with archetype selection \n"
+            "`!commander join` → Interactive game selection with reactions "
         ),
         inline=False
     )
@@ -558,9 +568,9 @@ def _create_help_page_4() -> discord.Embed:
     embed.add_field(
         name="🏆 Archetype & Achievement Examples",
         value=(
-            "**Archetype Selection:** Choose ⚡ Aggro, 🛡️ Control, 🔄 Combo with reactions 🆕\n"
-            "**Achievements:** `!commander achievements` • `!commander leaderboard` 🆕\n"
-            "**Analytics:** `!commander meta 7` → Last 7 days meta analysis 🆕"
+            "**Archetype Selection:** Choose ⚡ Aggro, 🛡️ Control, 🔄 Combo with reactions \n"
+            "**Achievements:** `!commander achievements` • `!commander leaderboard` \n"
+            "**Analytics:** `!commander meta 7` → Last 7 days meta analysis "
         ),
         inline=False
     )
@@ -580,26 +590,26 @@ def _create_help_page_4() -> discord.Embed:
         value="🔹 Page 1: Basic Commands • 🔹 Page 2: Commander Games • 🔹 Page 3: Archetype System\n\n**Use ⬅️ ➡️ reactions to navigate pages**",
         inline=False
     )
-    
+
     return embed
 
 
 def split_message_into_chunks(message: str, max_length: int = MAX_MESSAGE_LENGTH) -> List[str]:
     """
     Split a long message into chunks for Discord's character limit.
-    
+
     Args:
         message: The message to split.
         max_length: Maximum length per chunk.
-        
+
     Returns:
         List of message chunks.
     """
     if len(message) <= max_length:
         return [message]
-    
+
     chunks = []
     for i in range(0, len(message), max_length):
         chunks.append(message[i:i+max_length])
-    
+
     return chunks
