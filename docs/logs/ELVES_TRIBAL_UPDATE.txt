@@ -1,0 +1,23 @@
+✅ Archetype Normalization Update Complete!
+
+📋 Changes Made:
+🔄 Added archetype normalization system to treat 'Elves' the same as 'Tribal'
+🏆 Updated all achievement validation methods to use normalized archetypes
+📊 Updated player statistics tracking to use normalized archetypes  
+😀 Updated emoji mapping so 'Elves' uses the same emoji as 'Tribal' (🏺)
+
+🛠️ Technical Details:
+- Added `_normalize_archetype()` helper method in achievements.py
+- Updated `_check_archetype_wins()` to normalize both target and stored archetypes
+- Updated `_check_different_archetype_wins()` to count normalized archetypes
+- Updated `_check_same_archetype_wins()` to group normalized archetypes
+- Updated player stats calculation to track normalized archetype data
+- Updated EDHREC emoji mapping for consistency
+
+🎯 What This Means:
+- Players who play 'Elves' archetypes will have their achievements count toward 'Tribal' achievements
+- Statistics will group 'Elves' and 'Tribal' together for consistent tracking
+- Both 'Elves' and 'Tribal' display with the same emoji (🏺) for visual consistency
+- All existing data remains intact, just normalized for comparison
+
+✅ All tests pass and the system maintains full backward compatibility!

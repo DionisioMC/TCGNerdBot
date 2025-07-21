@@ -1,2 +1,6 @@
 .env
 /Colections
+*.pyc
+__pycache__/
+*.pyo
+*.pyd

@@ -1,19 +1,24 @@
 {
-  "game_1028390602951360585_0_1753089495": {
-    "game_id": "game_1028390602951360585_0_1753089495",
+  "F1": {
+    "game_id": "F1",
     "creator_id": 352817681654743041,
     "channel_id": 1028390602951360585,
     "players": {
       "352817681654743041": {
         "username": "InFeRMuS",
-        "commander": null,
-        "commander_colors": [],
+        "commander": "Voja, jaws of the conclave",
+        "commander_colors": [
+          "G",
+          "R",
+          "W"
+        ],
+        "commander_archetype": "Elves",
         "placement": null,
-        "joined_at": "2025-07-21T10:18:15.726511"
+        "joined_at": "2025-07-21T12:45:50.799384"
       }
     },
-    "start_time": "2025-07-21T10:18:15.726511",
-    "is_active": false,
+    "start_time": "2025-07-21T12:45:50.799201",
+    "is_active": true,
     "is_finished": false,
     "results_submitted": false
   }
