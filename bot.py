@@ -35,17 +35,17 @@ command_handlers: Optional[CommandHandlers] = None
 async def on_ready():
     """Event handler for when the bot is ready."""
     global command_handlers
-    
+
     guild = discord.utils.get(client.guilds, id=int(GUILD))
-    
+
     print(
         f'{client.user} is connected to the following guild:\n'
         f'{guild.name}(id: {guild.id})'
     )
-    
+
     # Initialize command handlers
     command_handlers = CommandHandlers(client, int(GUILD))
-    
+
     # Start the daily card task
     asyncio.create_task(daily_card_task(client, int(GUILD)))
     print("Daily card task started - will post random cards at 10:00 AM daily")
@@ -57,21 +57,21 @@ async def on_reaction_add(reaction: discord.Reaction, user: discord.User):
     # Ignore reactions from the bot itself
     if user == client.user:
         return
-    
+
     # Ensure command handlers are initialized
     if not command_handlers:
         return
-    
+
     try:
         # Handle placement reactions
         await command_handlers.handle_placement_reaction(reaction, user)
-        
-        # Handle join game reactions  
+
+        # Handle join game reactions
         await command_handlers.handle_join_game_reaction(reaction, user)
-        
+
         # Handle help navigation reactions
         await command_handlers.handle_help_navigation_reaction(reaction, user)
-        
+
         # Handle archetype selection reactions
         await command_handlers.handle_archetype_reaction(reaction, user)
     except Exception as e:
@@ -84,7 +84,7 @@ async def on_message(message: discord.Message):
     # Ignore messages from the bot itself
     if message.author == client.user:
         return
-    
+
     # Ensure command handlers are initialized
     if not command_handlers:
         return
@@ -136,22 +136,25 @@ async def on_message(message: discord.Message):
             await command_handlers.handle_upload_command(message)
 
         # Help command (with aliases)
-        elif (message.content.startswith('!help') or 
-              message.content.startswith('!commands') or 
+        elif (message.content.startswith('!help') or
+              message.content.startswith('!commands') or
               message.content.startswith('!h')):
             await command_handlers.handle_help_command(message)
 
         # Commander game tracking commands (with aliases)
-        elif (message.content.startswith('!commander') or 
+        elif (message.content.startswith('!commander') or
               message.content.startswith('!c ')):
             try:
                 # Handle alias
                 if message.content.startswith('!c '):
                     # Replace !c with !commander for processing
-                    command_content = message.content.replace('!c ', '!commander ', 1)
-                    args = command_content.split()[1:]  # Remove '!commander' from args
+                    command_content = message.content.replace(
+                        '!c ', '!commander ', 1)
+                    # Remove '!commander' from args
+                    args = command_content.split()[1:]
                 else:
-                    args = message.content.split()[1:]  # Remove '!commander' from args
+                    # Remove '!commander' from args
+                    args = message.content.split()[1:]
                 await command_handlers.handle_commander_command(message, args)
             except IndexError:
                 await command_handlers.handle_commander_command(message, [])

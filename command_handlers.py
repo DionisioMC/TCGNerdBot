@@ -89,8 +89,39 @@ class CommandHandlers:
             URL = f'https://mtg.fandom.com/wiki/{keyword}'
             page = requests.get(URL)
             wiki = BeautifulSoup(page.content, 'html.parser')
-            result = wiki.find('table').prettify()
-            await message.channel.send(result)
+
+            # Find the first table or infobox with relevant content
+            table = wiki.find('table', {'class': ['infobox', 'wikitable']})
+            if not table:
+                table = wiki.find('table')
+
+            if table:
+                # Extract text content instead of HTML
+                result = table.get_text(separator='\n', strip=True)
+
+                # Clean up excessive whitespace
+                lines = [line.strip()
+                         for line in result.split('\n') if line.strip()]
+                result = '\n'.join(lines)
+
+                # Limit content to Discord's character limit
+                if len(result) > 1900:  # Leave some room for embed formatting
+                    result = result[:1900] + "..."
+
+                # Send as code block for better formatting
+                await message.channel.send(f"```\n{result}\n```")
+            else:
+                # If no table found, get the first few paragraphs
+                paragraphs = wiki.find_all('p')[:3]  # Get first 3 paragraphs
+                if paragraphs:
+                    result = '\n\n'.join(
+                        [p.get_text(strip=True) for p in paragraphs if p.get_text(strip=True)])
+                    if len(result) > 1900:
+                        result = result[:1900] + "..."
+                    await message.channel.send(f"```\n{result}\n```")
+                else:
+                    await message.channel.send(f"❌ No relevant content found for '{keyword}' on MTG Wiki")
+
         except Exception as e:
             await message.channel.send(f"❌ Error fetching wiki data: {str(e)}")
 
