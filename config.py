@@ -63,5 +63,8 @@ EMBED_COLORS = {
     'commander_game': 0x8B4513,
     'commander_stats': 0x8B4513,
     'achievements': 0xf39c12,
-    'analytics': 0x3498db
+    'analytics': 0x3498db,
+    'trivia': 0x9b59b6,
+    'trivia_correct': 0x27ae60,
+    'trivia_timeout': 0xe67e22
 }

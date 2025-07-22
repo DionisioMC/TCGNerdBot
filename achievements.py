@@ -902,7 +902,7 @@ class AchievementManager:
                         if int(row['placement']) == 1:
                             stats['total_wins'] += 1
                             # Track archetype wins with normalization
-                            archetype = row.get('archetype', 'Unknown')
+                            archetype = row.get('commander_archetype', 'Unknown')
                             if archetype and archetype != 'Unknown':
                                 normalized_archetype = self._normalize_archetype(archetype)
                                 stats['archetype_wins'][normalized_archetype] += 1
@@ -910,19 +910,18 @@ class AchievementManager:
                         stats['commanders_played'].add(row['commander'])
                         
                         # Track archetypes played with normalization
-                        archetype = row.get('archetype', 'Unknown')
+                        archetype = row.get('commander_archetype', 'Unknown')
                         if archetype and archetype != 'Unknown':
                             normalized_archetype = self._normalize_archetype(archetype)
                             stats['archetypes_played'].add(normalized_archetype)
                         
                         stats['recent_games'].append(row)
                     
-                    # Find players played with - group by date and time to identify same games
+                    # Find players played with - group by game_date to identify same games
                     if int(row['user_id']) != user_id:
-                        # Check if this player was in same game (same date, time, and player count)
+                        # Check if this player was in same game (same game_date and player count)
                         for user_game in stats['recent_games']:
-                            if (user_game['date'] == row['date'] and 
-                                user_game['time'] == row['time'] and
+                            if (user_game['game_date'] == row['game_date'] and
                                 user_game['total_players'] == row['total_players']):
                                 stats['players_played_with'].add(int(row['user_id']))
                                 break
@@ -945,7 +944,7 @@ class AchievementManager:
                 for row in reader:
                     if int(row['user_id']) == user_id:
                         games.append({
-                            'date': datetime.strptime(f"{row['date']} {row['time']}", '%Y-%m-%d %H:%M'),
+                            'date': datetime.strptime(row['game_date'], '%Y-%m-%d %H:%M:%S'),
                             'placement': int(row['placement'])
                         })
             
@@ -977,7 +976,7 @@ class AchievementManager:
                 for row in reader:
                     if int(row['user_id']) == user_id:
                         games.append({
-                            'date': datetime.strptime(f"{row['date']} {row['time']}", '%Y-%m-%d %H:%M'),
+                            'date': datetime.strptime(row['game_date'], '%Y-%m-%d %H:%M:%S'),
                             'placement': int(row['placement'])
                         })
             
@@ -1018,7 +1017,7 @@ class AchievementManager:
                 for row in reader:
                     if (int(row['user_id']) == user_id and 
                         int(row['placement']) == 1 and 
-                        row['colors'] == target_color):
+                        row['commander_colors'] == target_color):
                         return True
             
             return False
@@ -1045,7 +1044,7 @@ class AchievementManager:
                 for row in reader:
                     if (int(row['user_id']) == user_id and 
                         int(row['placement']) == 1):
-                        colors = row['colors'].split(',')
+                        colors = row['commander_colors'].split(',')
                         if len(colors) == 5 and set(colors) == {'W', 'U', 'B', 'R', 'G'}:
                             return True
             
@@ -1065,7 +1064,7 @@ class AchievementManager:
                 for row in reader:
                     if (int(row['user_id']) == user_id and 
                         int(row['placement']) == 1 and 
-                        row['colors'] in ['C', '']):
+                        row['commander_colors'] in ['C', '']):
                         return True
             
             return False
@@ -1085,7 +1084,7 @@ class AchievementManager:
                 reader = csv.DictReader(f)
                 for row in reader:
                     if int(row['user_id']) == user_id:
-                        game_date = datetime.strptime(f"{row['date']} {row['time']}", '%Y-%m-%d %H:%M').date()
+                        game_date = datetime.strptime(row['game_date'], '%Y-%m-%d %H:%M:%S').date()
                         games_by_date[game_date] += 1
             
             return max(games_by_date.values(), default=0) >= required_games
@@ -1103,7 +1102,7 @@ class AchievementManager:
                 reader = csv.DictReader(f)
                 for row in reader:
                     if int(row['user_id']) == user_id:
-                        game_time = datetime.strptime(f"{row['date']} {row['time']}", '%Y-%m-%d %H:%M')
+                        game_time = datetime.strptime(row['game_date'], '%Y-%m-%d %H:%M:%S')
                         hour = game_time.hour
                         if start_hour <= hour < end_hour:
                             return True
@@ -1125,7 +1124,7 @@ class AchievementManager:
                 for row in reader:
                     if int(row['user_id']) == user_id:
                         games.append({
-                            'date': datetime.strptime(f"{row['date']} {row['time']}", '%Y-%m-%d %H:%M'),
+                            'date': datetime.strptime(row['game_date'], '%Y-%m-%d %H:%M:%S'),
                             'placement': int(row['placement'])
                         })
             
@@ -1158,7 +1157,7 @@ class AchievementManager:
                 for row in reader:
                     if (int(row['user_id']) == user_id and 
                         int(row['placement']) == 1):
-                        colors = row['colors'].split(',')
+                        colors = row['commander_colors'].split(',')
                         if set(colors) == set(target_colors):
                             return True
             
@@ -1213,7 +1212,7 @@ class AchievementManager:
                 
                 # Group by game using date, time, and player count as composite key
                 for row in reader:
-                    game_key = f"{row['date']}_{row['time']}_{row['total_players']}"
+                    game_key = f"{row['game_date']}_{row['total_players']}"
                     games_by_key[game_key].append(row)
                 
                 for game_key, players in games_by_key.items():
@@ -1300,7 +1299,7 @@ class AchievementManager:
                 reader = csv.DictReader(f)
                 for row in reader:
                     if int(row['user_id']) == user_id:
-                        game_date = datetime.strptime(f"{row['date']} {row['time']}", '%Y-%m-%d %H:%M')
+                        game_date = datetime.strptime(row['game_date'], '%Y-%m-%d %H:%M:%S')
                         if game_date.weekday() in [5, 6]:  # Saturday=5, Sunday=6
                             weekend_days.add(game_date.weekday())
             
@@ -1322,7 +1321,7 @@ class AchievementManager:
                 for row in reader:
                     if (int(row['user_id']) == user_id and 
                         int(row['placement']) == 1):
-                        game_date = datetime.strptime(f"{row['date']} {row['time']}", '%Y-%m-%d %H:%M').date()
+                        game_date = datetime.strptime(row['game_date'], '%Y-%m-%d %H:%M:%S').date()
                         wins_by_date[game_date] += 1
             
             return max(wins_by_date.values(), default=0) >= required_wins
@@ -1379,7 +1378,7 @@ class AchievementManager:
                 for row in reader:
                     if int(row['user_id']) == user_id:
                         games.append({
-                            'date': datetime.strptime(f"{row['date']} {row['time']}", '%Y-%m-%d %H:%M'),
+                            'date': datetime.strptime(row['game_date'], '%Y-%m-%d %H:%M:%S'),
                             'placement': int(row['placement']),
                             'total_players': int(row['total_players'])
                         })
@@ -1412,7 +1411,7 @@ class AchievementManager:
                 for row in reader:
                     if int(row['user_id']) == user_id:
                         games.append({
-                            'date': datetime.strptime(f"{row['date']} {row['time']}", '%Y-%m-%d %H:%M'),
+                            'date': datetime.strptime(row['game_date'], '%Y-%m-%d %H:%M:%S'),
                             'placement': int(row['placement']),
                             'total_players': int(row['total_players'])
                         })
@@ -1447,7 +1446,7 @@ class AchievementManager:
                 for row in reader:
                     if int(row['user_id']) == user_id:
                         games.append({
-                            'date': datetime.strptime(f"{row['date']} {row['time']}", '%Y-%m-%d %H:%M'),
+                            'date': datetime.strptime(row['game_date'], '%Y-%m-%d %H:%M:%S'),
                             'placement': int(row['placement'])
                         })
             
@@ -1492,7 +1491,7 @@ class AchievementManager:
                 # Group games by game_id
                 games_data = defaultdict(list)
                 for row in reader:
-                    games_data[f"{row['date']}_{row['time']}_{row['total_players']}"].append(row)
+                    games_data[f"{row['game_date']}_{row['total_players']}"].append(row)
                 
                 # Check each game where this player participated
                 for game_id, players in games_data.items():
@@ -1530,7 +1529,7 @@ class AchievementManager:
                 # Group games by game_id
                 games_data = defaultdict(list)
                 for row in reader:
-                    games_data[f"{row['date']}_{row['time']}_{row['total_players']}"].append(row)
+                    games_data[f"{row['game_date']}_{row['total_players']}"].append(row)
                 
                 # For each game, find co-players
                 for game_id, players in games_data.items():
@@ -1589,7 +1588,7 @@ class AchievementManager:
                 reader = csv.DictReader(f)
                 for row in reader:
                     if int(row['user_id']) == user_id:
-                        game_date = datetime.strptime(f"{row['date']} {row['time']}", '%Y-%m-%d %H:%M').date()
+                        game_date = datetime.strptime(row['game_date'], '%Y-%m-%d %H:%M:%S').date()
                         game_dates.add(game_date)
             
             # Check for any 7-day consecutive period
@@ -1627,7 +1626,7 @@ class AchievementManager:
                 for row in reader:
                     if (int(row['user_id']) == user_id and 
                         int(row['placement']) == 1):
-                        game_date = datetime.strptime(f"{row['date']} {row['time']}", '%Y-%m-%d %H:%M')
+                        game_date = datetime.strptime(row['game_date'], '%Y-%m-%d %H:%M:%S')
                         month_key = (game_date.year, game_date.month)
                         wins_by_month[month_key] += 1
             
@@ -1731,7 +1730,7 @@ class AchievementManager:
                         wins.append({
                             'commander': row['commander'],
                             'user_id': int(row['user_id']),
-                            'date': datetime.strptime(f"{row['date']} {row['time']}", '%Y-%m-%d %H:%M')
+                            'date': datetime.strptime(row['game_date'], '%Y-%m-%d %H:%M:%S')
                         })
                 
                 # Sort by date to find first wins
@@ -1774,7 +1773,7 @@ class AchievementManager:
                 # Group games by game_id
                 games_data = defaultdict(list)
                 for row in reader:
-                    games_data[f"{row['date']}_{row['time']}_{row['total_players']}"].append(row)
+                    games_data[f"{row['game_date']}_{row['total_players']}"].append(row)
                 
                 # Check each game where this player won
                 for game_id, players in games_data.items():
@@ -1809,7 +1808,7 @@ class AchievementManager:
                 reader = csv.DictReader(f)
                 for row in reader:
                     if int(row['user_id']) == user_id:
-                        colors = row['colors']
+                        colors = row['commander_colors']
                         if colors:  # Make sure not empty
                             # Normalize color combination (sort and join)
                             color_list = sorted(colors.split(','))
@@ -2110,7 +2109,6 @@ def create_achievement_detail_embed(achievement: Achievement, user_has_earned: b
     # Progress/Status section
     if user_has_earned and earned_date:
         try:
-            from datetime import datetime
             earned_dt = datetime.fromisoformat(earned_date.replace('Z', '+00:00'))
             date_str = earned_dt.strftime("%B %d, %Y")
         except:

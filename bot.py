@@ -46,9 +46,9 @@ async def on_ready():
     # Initialize command handlers
     command_handlers = CommandHandlers(client, int(GUILD))
 
-    # Start the daily card task
-    asyncio.create_task(daily_card_task(client, int(GUILD)))
-    print("Daily card task started - will post random cards at 10:00 AM daily")
+    # Start the daily card task (commented out - only use manual !dailycard commands)
+    # asyncio.create_task(daily_card_task(client, int(GUILD)))
+    # print("Daily card task started - will post random cards at 10:00 AM daily")
 
 
 @client.event
@@ -74,6 +74,9 @@ async def on_reaction_add(reaction: discord.Reaction, user: discord.User):
 
         # Handle archetype selection reactions
         await command_handlers.handle_archetype_reaction(reaction, user)
+
+        # Handle trivia answer reactions
+        await command_handlers.handle_trivia_reaction(reaction, user)
     except Exception as e:
         print(f"Error processing reaction: {e}")
 
@@ -100,7 +103,11 @@ async def on_message(message: discord.Message):
             keyword = parse_braced_content(message.content)
             await command_handlers.handle_wiki_lookup(message, keyword)
 
-        # Handle file uploads - Card list checking
+        # Upload collection command: !upload (check before general file uploads)
+        elif message.content.startswith('!upload'):
+            await command_handlers.handle_upload_command(message)
+
+        # Handle file uploads - Card list checking (TXT files only)
         elif message.attachments:
             await command_handlers.handle_file_upload(message)
 
@@ -131,10 +138,6 @@ async def on_message(message: discord.Message):
         elif message.content.startswith('!dailycard') or message.content.startswith('!randomcard'):
             await command_handlers.handle_dailycard_command(message)
 
-        # Upload collection command: !upload
-        elif message.content.startswith('!upload'):
-            await command_handlers.handle_upload_command(message)
-
         # Help command (with aliases)
         elif (message.content.startswith('!help') or
               message.content.startswith('!commands') or
@@ -162,6 +165,24 @@ async def on_message(message: discord.Message):
         # Short alias for commander (just "!c")
         elif message.content == '!c':
             await command_handlers.handle_commander_command(message, [])
+
+        # Trivia commands
+        elif message.content.startswith('!trivia'):
+            parts = message.content.split()
+            if len(parts) == 1:
+                # Start new trivia game
+                await command_handlers.handle_trivia_command(message)
+            elif len(parts) == 2:
+                if parts[1].lower() == 'stats':
+                    # Show trivia stats
+                    await command_handlers.handle_trivia_stats_command(message)
+                elif parts[1].lower() == 'leaderboard':
+                    # Show trivia leaderboard
+                    await command_handlers.handle_trivia_leaderboard_command(message)
+                else:
+                    await message.channel.send("❌ Unknown trivia command! Use `!trivia`, `!trivia stats`, or `!trivia leaderboard`")
+            else:
+                await message.channel.send("❌ Invalid trivia command! Use `!trivia`, `!trivia stats`, or `!trivia leaderboard`")
 
         # Original collection request when bot is mentioned
         elif client.user and client.user.mentioned_in(message):

@@ -576,6 +576,17 @@ def _create_help_page_4() -> discord.Embed:
     )
 
     embed.add_field(
+        name="🧠 Trivia & Fun",
+        value=(
+            "**Trivia Commands:**\n"
+            "`!trivia` → Start MTG trivia game (react with 🇦🇧🇨🇩)\n"
+            "`!trivia stats` → Your trivia statistics and accuracy\n"
+            "`!trivia leaderboard` → Top trivia players by points"
+        ),
+        inline=False
+    )
+
+    embed.add_field(
         name="� File Upload Examples",
         value=(
             "**Want List (📎 .txt file):**\n"

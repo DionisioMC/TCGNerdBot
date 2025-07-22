@@ -50,6 +50,20 @@ This bot helps you and your friends manage your card collections, find card info
 - `!commander achievements info <name>` - View detailed achievement information
 - `!commander leaderboard` - Achievement leaderboard
 
+### 🧠 Interactive Trivia System
+
+- **🎯 MTG Knowledge Testing**: 70+ questions covering rules, Commander format, cards, lore, and history
+- **🎮 Competitive Gameplay**: React with 🇦🇧🇨🇩 emojis to answer - each option locked by first player
+- **⏰ Time Pressure**: 2-minute limit with automatic completion when all options are chosen
+- **🏆 Points & Rankings**: Difficulty-based scoring (5-25 points) with server-wide leaderboards
+- **📊 Comprehensive Stats**: Track accuracy, category performance, and improvement over time
+- **🎓 Educational Value**: Learn while playing with questions spanning all aspects of MTG
+
+**Trivia Commands:**
+- `!trivia` - Start a new Magic: The Gathering trivia game
+- `!trivia stats` - View your personal trivia statistics and progress
+- `!trivia leaderboard` - View server leaderboard ranked by trivia points
+
 ### 📊 Collection Management & Analysis
 
 - **📤 File Upload Analysis**: Upload a .txt file with your want list (format: `1x Card Name` per line) to see who in your group owns those cards

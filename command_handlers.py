@@ -3,6 +3,7 @@ Command handlers for the TCG Nerd Bot.
 Contains functions to handle various bot commands and responses.
 """
 
+import asyncio
 import random
 from typing import List
 import discord
@@ -34,6 +35,10 @@ from commander_analytics import (
 from achievements import (
     achievement_manager, create_achievement_embed, create_achievements_overview_embed,
     create_achievement_detail_embed
+)
+from trivia_system import (
+    trivia_manager, create_trivia_question_embed, create_trivia_results_embed,
+    create_trivia_stats_embed, create_trivia_leaderboard_embed
 )
 
 
@@ -290,7 +295,18 @@ class CommandHandlers:
         """Handle !dailycard or !randomcard command."""
         try:
             await message.channel.send("🎲 Fetching a random card for you...")
-            await post_daily_card(self.client, self.guild_id)
+            
+            # Get random card data
+            from scryfall_api import ScryfallAPI
+            from discord_helpers import create_daily_card_embed
+            
+            card_data = await ScryfallAPI.get_random_card()
+            if card_data:
+                embed = create_daily_card_embed(card_data)
+                await message.channel.send(embed=embed)
+            else:
+                await message.channel.send("❌ Failed to fetch a random card. Try again later!")
+                
         except Exception as e:
             await message.channel.send(f"❌ Error fetching random card: {str(e)}")
 
@@ -1251,6 +1267,148 @@ class CommandHandlers:
         # Clean up the message data
         if message_id in self.archetype_messages:
             del self.archetype_messages[message_id]
+
+    async def handle_trivia_command(self, message: discord.Message) -> None:
+        """Handle trivia command to start a new trivia game."""
+        try:
+            # Check if there's already an active trivia game in this channel
+            for game in trivia_manager.active_games.values():
+                if game.channel_id == message.channel.id and not game.is_finished:
+                    await message.channel.send("❌ There's already an active trivia game in this channel! Wait for it to finish.")
+                    return
+            
+            # Send initial message to get message ID
+            temp_embed = discord.Embed(
+                title="🧠 Starting Trivia Game...",
+                description="Loading question...",
+                color=0x00ffff
+            )
+            trivia_message = await message.channel.send(embed=temp_embed)
+            
+            # Start the trivia game
+            game = trivia_manager.start_trivia_game(message.channel.id, trivia_message.id, message.author.id)
+            
+            # Create the question embed
+            embed = create_trivia_question_embed(game)
+            
+            # Update the message with the actual question
+            await trivia_message.edit(embed=embed)
+            
+            # Add reaction options
+            option_emojis = ["🇦", "🇧", "🇨", "🇩"]
+            for emoji in option_emojis:
+                await trivia_message.add_reaction(emoji)
+            
+            print(f"Started trivia game in channel {message.channel.id} with message {trivia_message.id}")
+            
+        except Exception as e:
+            await message.channel.send(f"❌ Error starting trivia game: {str(e)}")
+            print(f"Error starting trivia: {e}")
+
+    async def handle_trivia_stats_command(self, message: discord.Message) -> None:
+        """Handle trivia stats command to show player statistics."""
+        try:
+            embed = create_trivia_stats_embed(message.author.id, message.guild)
+            await message.channel.send(embed=embed)
+        except Exception as e:
+            await message.channel.send(f"❌ Error displaying trivia stats: {str(e)}")
+            print(f"Error showing trivia stats: {e}")
+
+    async def handle_trivia_leaderboard_command(self, message: discord.Message) -> None:
+        """Handle trivia leaderboard command to show top players."""
+        try:
+            embed = create_trivia_leaderboard_embed(message.guild)
+            await message.channel.send(embed=embed)
+        except Exception as e:
+            await message.channel.send(f"❌ Error displaying trivia leaderboard: {str(e)}")
+            print(f"Error showing trivia leaderboard: {e}")
+
+    async def handle_trivia_reaction(self, reaction: discord.Reaction, user: discord.User) -> None:
+        """Handle trivia answer reactions."""
+        if user.bot:
+            return
+        
+        # Check if this is a trivia game message
+        message_id = reaction.message.id
+        if message_id not in trivia_manager.active_games:
+            return
+        
+        game = trivia_manager.active_games[message_id]
+        if game.is_finished:
+            return
+        
+        # Map emoji to answer index
+        emoji_to_index = {
+            "🇦": 0, "🇧": 1, "🇨": 2, "🇩": 3
+        }
+        
+        answer_index = emoji_to_index.get(str(reaction.emoji))
+        if answer_index is None:
+            return
+        
+        # Process the answer
+        success, message_text = trivia_manager.handle_player_answer(message_id, user.id, answer_index)
+        
+        if success:
+            # Update the embed to show the locked option
+            try:
+                updated_embed = create_trivia_question_embed(game)
+                await reaction.message.edit(embed=updated_embed)
+                
+                # Check if game should be completed (all options locked)
+                if trivia_manager.check_game_completion(message_id):
+                    await self._finish_trivia_game(reaction.message)
+                
+            except Exception as e:
+                print(f"Error updating trivia message: {e}")
+        else:
+            # Send error message (will be auto-deleted)
+            try:
+                error_msg = await reaction.message.channel.send(f"❌ <@{user.id}> {message_text}")
+                # Delete error message after 5 seconds
+                await asyncio.sleep(5)
+                await error_msg.delete()
+            except:
+                pass
+        
+        # Remove user's reaction
+        try:
+            await reaction.remove(user)
+        except:
+            pass
+
+    async def _finish_trivia_game(self, message: discord.Message) -> None:
+        """Finish a trivia game and show results."""
+        try:
+            message_id = message.id
+            results = await trivia_manager.finish_trivia_game(message_id)
+            
+            if "error" in results:
+                return
+            
+            # Create results embed
+            embed = create_trivia_results_embed(results, message.guild)
+            
+            # Clear reactions and update message
+            try:
+                await message.clear_reactions()
+            except:
+                pass
+            
+            await message.edit(embed=embed)
+            
+            # Send congratulations message if there are winners
+            if results["winners"] and results["points_awarded"] > 0:
+                winners_text = ", ".join([f"<@{winner_id}>" for winner_id in results["winners"]])
+                congrats_msg = f"🎉 Congratulations {winners_text}! You earned {results['points_awarded']} trivia points each!"
+                await message.channel.send(congrats_msg)
+            elif results.get("only_starter_answered"):
+                starter_text = f"<@{list(results['all_answers'].keys())[0]}>"
+                info_msg = f"ℹ️ {starter_text} answered correctly but no points were awarded since no other players participated. Invite others to join for competitive trivia!"
+                await message.channel.send(info_msg)
+            
+        except Exception as e:
+            print(f"Error finishing trivia game: {e}")
 
 
 def parse_bracketed_content(content: str) -> str:

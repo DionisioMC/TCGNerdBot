@@ -717,7 +717,7 @@ class CommanderGameManager:
                             commander, 0) + 1
 
                         # Process color information
-                        colors_str = row.get('colors', '?')
+                        colors_str = row.get('commander_colors', '?')
                         if colors_str and colors_str != '?':
                             colors = colors_str.split(',')
 

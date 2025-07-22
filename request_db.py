@@ -17,6 +17,8 @@ def check_card_in_db(db_data, card, owner=None):
         list: A list of owners for the matching cards. If `owner` is specified, 
               only the matching owner's name is returned in the list.
     """
+    import unicodedata
+    
     # Handle null or empty database
     if not db_data:
         return []
@@ -30,13 +32,24 @@ def check_card_in_db(db_data, card, owner=None):
         return []  # Invalid input
     
     list_owner = []
+    
+    # Normalize the search owner name if provided
+    normalized_search_owner = unicodedata.normalize('NFC', owner) if owner else None
+    
     for card_db in db_data:
         if card_name.lower() in card_db['Name'].lower():
+            card_owner = card_db['Owner']
+            
             if owner:
-                if card_db['Owner'] == owner:
-                    list_owner.append(card_db['Owner'])
+                # Normalize card owner for comparison
+                normalized_card_owner = unicodedata.normalize('NFC', card_owner)
+                
+                # Try exact match first, then normalized comparison
+                if card_owner == owner or normalized_card_owner == normalized_search_owner:
+                    list_owner.append(card_owner)
             else:
-                list_owner.append(card_db['Owner'])
+                list_owner.append(card_owner)
+                
     return list_owner
 
 
@@ -124,7 +137,7 @@ def get_cards_from_csv(file_path):
     Returns:
         list[dict]: A list of dictionaries where each dictionary represents a row in the CSV file.
     """
-    with open(file_path, mode='r', newline='') as file:
+    with open(file_path, mode='r', newline='', encoding='utf-8') as file:
         csv_reader = csv.DictReader(file)
         colection = [row for row in csv_reader]
     return colection
@@ -291,16 +304,28 @@ def quick_rarity_comparison_by_owner(collection, set_code, owner):
         dict: Comparison results with completion percentages
     """
     try:
+        import unicodedata
+        
+        # Normalize the owner name to handle special characters
+        normalized_owner = unicodedata.normalize('NFC', owner)
+        
         # Get set statistics
         set_stats = get_set_stats(set_code)
         if not set_stats:
             return None
 
-        # Get owner's cards from this set
-        owner_cards = [card for card in collection
-                       if (card.get('Set code', '').lower() == set_code.lower() or
-                           card.get('Set name', '').lower() == set_code.lower())
-                       and card.get('Owner', '') == owner]
+        # Get owner's cards from this set with normalized name comparison
+        owner_cards = []
+        for card in collection:
+            if ((card.get('Set code', '').lower() == set_code.lower() or
+                 card.get('Set name', '').lower() == set_code.lower())):
+                
+                card_owner = card.get('Owner', '')
+                normalized_card_owner = unicodedata.normalize('NFC', card_owner)
+                
+                # Try exact match first, then normalized comparison
+                if card_owner == owner or normalized_card_owner == normalized_owner:
+                    owner_cards.append(card)
 
         # Count by rarity
         owner_rarity_breakdown = {'common': 0,
@@ -427,10 +452,19 @@ def compare_all_sets_by_owner(collection, owner):
         list: List of set comparisons sorted by completion percentage
     """
     try:
+        import unicodedata
+        
+        # Normalize the owner name to handle special characters
+        normalized_owner = unicodedata.normalize('NFC', owner)
+        
         # Get all sets in the owner's collection
         owner_sets = set()
         for card in collection:
-            if card.get('Owner', '') == owner:
+            card_owner = card.get('Owner', '')
+            normalized_card_owner = unicodedata.normalize('NFC', card_owner)
+            
+            # Use normalized comparison for special characters
+            if card_owner == owner or normalized_card_owner == normalized_owner:
                 set_code = card.get('Set code', '')
                 if set_code:
                     owner_sets.add(set_code)
@@ -465,10 +499,19 @@ def compare_top_sets_by_owner(collection, owner, top_count=15):
         list: List of set comparisons sorted by completion percentage
     """
     try:
+        import unicodedata
+        
+        # Normalize the owner name to handle special characters
+        normalized_owner = unicodedata.normalize('NFC', owner)
+        
         # First, count cards per set for this owner (fast operation)
         set_card_counts = {}
         for card in collection:
-            if card.get('Owner', '') == owner:
+            card_owner = card.get('Owner', '')
+            normalized_card_owner = unicodedata.normalize('NFC', card_owner)
+            
+            # Use normalized comparison for special characters
+            if card_owner == owner or normalized_card_owner == normalized_owner:
                 set_code = card.get('Set code', '')
                 if set_code:
                     if set_code not in set_card_counts:
